@@ -16,7 +16,8 @@ from loguru import logger
 
 from utils.config_utils import *  # noqa: E402, F403
 
-
+from wjxtools import pdb_decorator
+@pdb_decorator
 @hydra.main(config_path="config", config_name="base", version_base="1.1")
 def main(config: OmegaConf):
     # import ipdb; ipdb.set_trace()
