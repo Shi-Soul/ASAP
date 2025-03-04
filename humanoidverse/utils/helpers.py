@@ -82,7 +82,7 @@ def parse_observation(cls: Any,
                       current_noise_curriculum_value: Any) -> None:
     """ Parse observations for the legged_robot_base class
     """
-
+    # breakpoint()
     for obs_key in key_list:
         if obs_key.endswith("_raw"):
             obs_key = obs_key[:-4]

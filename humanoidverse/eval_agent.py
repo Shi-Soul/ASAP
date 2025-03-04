@@ -43,6 +43,7 @@ def on_press(key, env):
         pass
 
 def listen_for_keypress(env):
+    return
     with keyboard.Listener(on_press=lambda key: on_press(key, env)) as listener:
         listener.join()
 
