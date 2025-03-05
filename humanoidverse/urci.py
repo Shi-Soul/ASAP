@@ -88,7 +88,8 @@ class MujocoRobot:
         self.dt = self.decimation * self.sim_dt
         
         
-        self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
+        # self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
+        self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist.xml')
         self.model.opt.timestep = self.dt
         self.data = mujoco.MjData(self.model) # type: ignore
         
@@ -115,7 +116,7 @@ class MujocoRobot:
         dof_init_pose = cfg_init_state.default_joint_angles
         dof_effort_limit_list = self.cfg.robot.dof_effort_limit_list
         
-        self.dof_init_pose = np.array([dof_init_pose[name] for name in self.dof_names])
+        self.dof_init_pose = np.array([dof_init_pose[name] for name in self.dof_names]) *0
         self.tau_limit = np.array(dof_effort_limit_list)
         
         
@@ -140,7 +141,7 @@ class MujocoRobot:
         self.data.qpos[7:] = self.dof_init_pose
         self.data.qvel[:] = 0
         
-        breakpoint()
+        # breakpoint()
         
     def __make_buffer(self):
         self.history_handler = HistoryHandler(1, self.cfg.obs.obs_auxiliary, self.cfg.obs.obs_dims, self.device)
@@ -236,11 +237,12 @@ class MujocoRobot:
             
             
             # self.print_torque(tau)
-            # tau*=0
+            # tau*=0.3
             # tau[12:]*=0
             # self.data.ctrl[:self.num_actions] = tau
             print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
             # breakpoint()
+            self.data.qpos[:3] = np.array([0,0,1])
             self.data.ctrl = tau
 
             mujoco.mj_step(self.model, self.data) # type: ignore
@@ -257,7 +259,7 @@ class MujocoRobot:
                         geom2_name = geom_name(contact.geom2)
                         print(f"Warning!!! Collision between '{geom1_name,contact.geom1}' and '{geom2_name,contact.geom2}' at position {contact.pos}.")
                     
-                # breakpoint()
+                breakpoint()
             if RENDER:
                 if self.viewer.is_alive:
                     self.viewer.render()
@@ -265,8 +267,9 @@ class MujocoRobot:
                     raise Exception("Mujoco Robot Exit")
 
 
-
+from wjxtools import pdb_decorator
 @hydra.main(config_path="config", config_name="base_eval")
+@pdb_decorator
 def main(override_config: OmegaConf):
     def setup_logging():
     
