@@ -7,8 +7,12 @@
     
   <statistic meansize="0.144785" extent="1.23314" center="0.025392 2.0634e-05 -0.245975"/>
   <default>
+    <!-- <joint frictionloss="1"/> -->
     <joint damping="0.001" armature="0.01" frictionloss="0.1"/>
+    <!-- <geom solref='0.01 2'/>
+    <equality solref='0.01 2'/> -->
   </default>
+
 
 
   <asset>

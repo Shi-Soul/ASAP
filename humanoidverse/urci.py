@@ -16,6 +16,7 @@ import os
 import sys
 from pathlib import Path
 
+import torch
 import hydra
 from hydra.utils import instantiate
 from hydra.core.hydra_config import HydraConfig
@@ -23,6 +24,7 @@ from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 from humanoidverse.utils.logging import HydraLoggerBridge
 from humanoidverse.envs.env_utils.history_handler import HistoryHandler
+from humanoidverse.utils.helpers import parse_observation
 from scipy.spatial.transform import Rotation as R
 import logging
 from utils.config_utils import *  # noqa: E402, F403
@@ -36,6 +38,7 @@ import onnxruntime as ort
 import numpy as np
 
 
+np2torch = lambda x: torch.tensor(x, dtype=torch.float32)
 
 def wrap_to_pi_float(angles:float):
     angles %= 2*np.pi
@@ -86,10 +89,13 @@ class MujocoRobot:
         self.decimation = cfg.simulator.config.sim.control_decimation
         self.sim_dt = 1/cfg.simulator.config.sim.fps
         self.dt = self.decimation * self.sim_dt
+        self.clip_action_limit = cfg.robot.control.action_clip_value
+        self.clip_observations = cfg.env.config.normalization.clip_observations
+        self.action_scale = cfg.robot.control.action_scale
         
         
         # self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
-        self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist.xml')
+        self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist_phys.xml')
         self.model.opt.timestep = self.dt
         self.data = mujoco.MjData(self.model) # type: ignore
         
@@ -123,6 +129,10 @@ class MujocoRobot:
         self.kp = np.zeros(self.num_dofs)
         self.kd = np.zeros(self.num_dofs)
         
+        
+# kps: [100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40]
+# kds: [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2]
+        
         for i in range(self.num_dofs):
             name = self.dof_names[i]
             found = False
@@ -134,6 +144,15 @@ class MujocoRobot:
                     logger.debug(f"PD gain of joint {name} were defined, setting them to {self.kp[i]} and {self.kd[i]}")
             if not found:
                 raise ValueError(f"PD gain of joint {name} were not defined. Should be defined in the yaml file.")
+        
+        self.kp[:15] = np.array([100, 100, 100, 150, 40, 40, 
+                                 100, 100, 100, 150, 40, 40,
+                                 200,200,200])
+        self.kd[:15] = np.array([2, 2, 2, 4, 0.5, 0.5, 
+                                 2, 2, 2, 4, 0.5, 0.5,
+                                 1,1,1])* 0.2
+        self.kp[15:] = 30
+        self.kd[15:] = 0.5
         
         
         self.data.qpos[:3] = np.array(cfg_init_state.pos)
@@ -224,7 +243,11 @@ class MujocoRobot:
         # breakpoint()
     
         
-    def ApplyAction(self, target_q): 
+    def ApplyAction(self, action): 
+        self.act = action
+        target_q = np.clip(action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
+        
+        
         for i in range(self.decimation):
             self.GetState()
             
@@ -237,11 +260,11 @@ class MujocoRobot:
             
             
             # self.print_torque(tau)
-            # tau*=0
+            tau*=0
             # tau[12:]*=0
             # self.data.ctrl[:self.num_actions] = tau
-            print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
-            breakpoint()
+            # print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
+            # breakpoint()
             # breakpoint()
             # self.data.qpos[:3] = np.array([0,0,1])
             self.data.ctrl = tau
@@ -260,13 +283,117 @@ class MujocoRobot:
                         geom2_name = geom_name(contact.geom2)
                         print(f"Warning!!! Collision between '{geom1_name,contact.geom1}' and '{geom2_name,contact.geom2}' at position {contact.pos}.")
                     
-                breakpoint()
+                # breakpoint()
             if RENDER:
                 if self.viewer.is_alive:
                     self.viewer.render()
                 else:
                     raise Exception("Mujoco Robot Exit")
 
+        self.UpdateObs()
+
+    def UpdateObs(self):
+        
+        self.obs_buf_dict_raw = {}
+        self.hist_obs_dict = {}
+        
+        noise_extra_scale = 1.
+        for obs_key, obs_config in self.cfg.obs.obs_dict.items():
+            self.obs_buf_dict_raw[obs_key] = dict()
+
+            parse_observation(self, obs_config, self.obs_buf_dict_raw[obs_key], self.cfg.obs.obs_scales, self.cfg.obs.noise_scales, noise_extra_scale)
+        
+        # Compute history observations
+        history_obs_list = self.history_handler.history.keys()
+        parse_observation(self, history_obs_list, self.hist_obs_dict, self.cfg.obs.obs_scales, self.cfg.obs.noise_scales, noise_extra_scale)
+        
+        
+        self.obs_buf_dict = dict()
+        
+        for obs_key, obs_config in self.cfg.obs.obs_dict.items():
+            obs_keys = sorted(obs_config)
+            # print("obs_keys", obs_keys)            
+            self.obs_buf_dict[obs_key] = torch.cat([self.obs_buf_dict_raw[obs_key][key] for key in obs_keys], dim=-1)
+            
+            
+        clip_obs = self.clip_observations
+        for obs_key, obs_val in self.obs_buf_dict.items():
+            self.obs_buf_dict[obs_key] = torch.clip(obs_val, -clip_obs, clip_obs)
+
+        for key in self.history_handler.history.keys():
+            self.history_handler.add(key, self.hist_obs_dict[key])
+            
+        # breakpoint()
+
+    ######################### Observations #########################
+    def _get_obs_command_lin_vel(self):
+        return np2torch(self.cmd[:2])
+    
+    def _get_obs_command_ang_vel(self):
+        return np2torch(self.cmd[2:3])
+    
+    def _get_obs_actions(self,):
+        return np2torch(self.act)
+    
+    def _get_obs_base_pos_z(self,):
+        return np2torch(self.pos[2:3])
+    
+    def _get_obs_feet_contact_force(self,):
+        raise NotImplementedError("Not implemented")
+        return self.data.contact.force[:, :].view(self.num_envs, -1)
+          
+    
+    def _get_obs_base_lin_vel(self,):
+        return np2torch(self.vel)
+    
+    def _get_obs_base_ang_vel(self,):
+        return np2torch(self.omega)
+    
+    def _get_obs_projected_gravity(self,):
+        return np2torch(self.gvec)
+    
+    def _get_obs_dof_pos(self,):
+        return np2torch(self.q - self.dof_init_pose)
+    
+    def _get_obs_dof_vel(self,):
+        return np2torch(self.dq)
+    
+    def _get_obs_history(self,):
+        assert "history" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['history']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
+    
+    def _get_obs_short_history(self,):
+        assert "short_history" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['short_history']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
+    
+    def _get_obs_long_history(self,):
+        assert "long_history" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['long_history']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
+    
 
 from wjxtools import pdb_decorator
 @hydra.main(config_path="config", config_name="base_eval")
@@ -417,17 +544,14 @@ def main(override_config: OmegaConf):
     policy_fn = load_policy(config, checkpoint)
     
     robot = MujocoRobot(config)
-    clip_action_limit = config.robot.control.action_clip_value
-    action_scale = config.robot.control.action_scale
-    dof_init_pose = robot.dof_init_pose
     
-    breakpoint()
+    # breakpoint()
     while True:
         # action = np.random.randn(robot.num_actions)*1e-4
         action = np.zeros(robot.num_actions)
-        trg_q = np.clip(action, -clip_action_limit, clip_action_limit) * action_scale + dof_init_pose
+        # trg_q = np.clip(action, -clip_action_limit, clip_action_limit) * action_scale + dof_init_pose
         
-        robot.ApplyAction(trg_q)
+        robot.ApplyAction(action)
     # algo.evaluate_policy()
     
     breakpoint()
