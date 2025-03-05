@@ -123,7 +123,6 @@ def main(override_config: OmegaConf):
         with open(eval_log_dir / "config.yaml", "w") as file:
             OmegaConf.save(config, file)
 
-
     def load_policy(config: OmegaConf, checkpoint: Path):
         assert checkpoint.suffix == '.onnx', f"File {checkpoint} is not a .onnx file."
 
