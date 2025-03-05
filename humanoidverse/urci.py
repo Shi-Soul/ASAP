@@ -149,14 +149,14 @@ class MujocoRobot:
             if not found:
                 raise ValueError(f"PD gain of joint {name} were not defined. Should be defined in the yaml file.")
         
-        self.kp[:15] = np.array([100, 100, 100, 150, 40, 40, 
-                                 100, 100, 100, 150, 40, 40,
-                                 200,200,200])
-        self.kd[:15] = np.array([2, 2, 2, 4, 0.5, 0.5, 
-                                 2, 2, 2, 4, 0.5, 0.5,
-                                 1,1,1])* 0.2
-        self.kp[15:] = 30
-        self.kd[15:] = 0.5
+        # self.kp[:15] = np.array([100, 100, 100, 150, 40, 40, 
+        #                          100, 100, 100, 150, 40, 40,
+        #                          200,200,200])
+        # self.kd[:15] = np.array([2, 2, 2, 4, 0.5, 0.5, 
+        #                          2, 2, 2, 4, 0.5, 0.5,
+        #                          1,1,1])* 0.2
+        # self.kp[15:] = 30
+        # self.kd[15:] = 0.5
         
         
         self.data.qpos[:3] = np.array(cfg_init_state.pos)
@@ -265,7 +265,7 @@ class MujocoRobot:
             
             
             # self.print_torque(tau)
-            tau*=0
+            # tau*=0
             # tau[12:]*=0
             # self.data.ctrl[:self.num_actions] = tau
             # print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
@@ -564,6 +564,7 @@ def main(override_config: OmegaConf):
         # action = np.zeros(robot.num_actions)
         # trg_q = np.clip(action, -clip_action_limit, clip_action_limit) * action_scale + dof_init_pose
         
+        print(action)
         robot.ApplyAction(action)
     # algo.evaluate_policy()
     
