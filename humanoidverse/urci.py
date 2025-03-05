@@ -1,4 +1,17 @@
 
+REAL       :bool    = False
+BYPASS_ACT :bool    = False
+HEADING_CMD:bool    = True
+
+LOG        :bool    = True
+RENDER     :bool    = True
+PLOT       :bool    = False
+defcmd = [0.0, 0.0, 0.0, 0.0]
+
+
+if not REAL:
+    import mujoco, mujoco_viewer
+    import glfw 
 import os
 import sys
 from pathlib import Path
@@ -9,6 +22,8 @@ from hydra.core.hydra_config import HydraConfig
 from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 from humanoidverse.utils.logging import HydraLoggerBridge
+from humanoidverse.envs.env_utils.history_handler import HistoryHandler
+from scipy.spatial.transform import Rotation as R
 import logging
 from utils.config_utils import *  # noqa: E402, F403
 # add argparse arguments
@@ -19,6 +34,233 @@ from loguru import logger
 
 import onnxruntime as ort
 import numpy as np
+
+
+
+def wrap_to_pi_float(angles:float):
+    angles %= 2*np.pi
+    angles -= 2*np.pi * (angles > np.pi)
+    return angles
+
+def quaternion_to_euler_array(quat):
+    # Ensure quaternion is in the correct format [x, y, z, w]
+    x, y, z, w = quat
+    
+    # Roll (x-axis rotation)
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll_x = np.arctan2(t0, t1)
+    
+    # Pitch (y-axis rotation)
+    t2 = +2.0 * (w * y - z * x)
+    t2 = np.clip(t2, -1.0, 1.0)
+    pitch_y = np.arcsin(t2)
+    
+    # Yaw (z-axis rotation)
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw_z = np.arctan2(t3, t4)
+    
+    # Returns roll, pitch, yaw in a NumPy array in radians
+    return np.array([roll_x, pitch_y, yaw_z])
+
+class MujocoRobot:
+    ACT_EMA: bool = False # Noise
+    RAND_NOISE: bool = True
+    RAND_DELAY: bool = True
+    RAND_MASK : bool = False
+    
+    ema_alpha = 0.1  # EMA smoothing factor
+    noise_ratio = 3e-2
+    delay_ratio = (0.4, 0.8)
+    # delay_ratio = (0.5, 1.5)
+    # delay_ratio = (0.5, 2.0)
+    mask_ratio = 0.8
+    mk_rand_noise = lambda tens, ratio: tens * (1 + np.random.randn(*tens.shape).astype(tens.dtype) * ratio) # type: ignore
+    print_torque = lambda tau: print(f"tau (norm, max) = {np.linalg.norm(tau):.2f}, \t{np.max(tau):.2f}", end='\r')
+    
+    def __init__(self, cfg):
+        self.cfg = cfg
+        self.device="cpu"
+        
+        self.decimation = cfg.simulator.config.sim.control_decimation
+        self.sim_dt = 1/cfg.simulator.config.sim.fps
+        self.dt = self.decimation * self.sim_dt
+        
+        
+        self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
+        self.model.opt.timestep = self.dt
+        self.data = mujoco.MjData(self.model) # type: ignore
+        
+        self.cmd = np.array(defcmd)
+        self.num_actions = cfg.robot.actions_dim
+        self.num_ctrl = self.data.ctrl.shape[0]
+        assert self.num_ctrl == self.num_actions, f"Number of control DOFs {self.num_ctrl} does not match number of actions {self.num_actions}"
+        
+        self.__make_init_pose()
+        self.__make_buffer()
+        self.GetState()
+        mujoco.mj_step(self.model, self.data) # type: ignore    
+        if RENDER:
+            self.__make_viewer()
+
+    def __make_init_pose(self):
+        cfg_init_state = self.cfg.robot.init_state
+        self.body_names = self.cfg.robot.body_names
+        self.dof_names = self.cfg.robot.dof_names
+        self.num_bodies = len(self.body_names)
+        self.num_dofs = len(self.dof_names)
+        
+        
+        dof_init_pose = cfg_init_state.default_joint_angles
+        dof_effort_limit_list = self.cfg.robot.dof_effort_limit_list
+        
+        self.dof_init_pose = np.array([dof_init_pose[name] for name in self.dof_names])
+        self.tau_limit = np.array(dof_effort_limit_list)
+        
+        
+        self.kp = np.zeros(self.num_dofs)
+        self.kd = np.zeros(self.num_dofs)
+        
+        for i in range(self.num_dofs):
+            name = self.dof_names[i]
+            found = False
+            for dof_name in self.cfg.robot.control.stiffness.keys():
+                if dof_name in name:
+                    self.kp[i] = self.cfg.robot.control.stiffness[dof_name]
+                    self.kd[i] = self.cfg.robot.control.damping[dof_name]
+                    found = True
+                    logger.debug(f"PD gain of joint {name} were defined, setting them to {self.kp[i]} and {self.kd[i]}")
+            if not found:
+                raise ValueError(f"PD gain of joint {name} were not defined. Should be defined in the yaml file.")
+        
+        
+        self.data.qpos[:3] = np.array(cfg_init_state.pos)
+        self.data.qpos[3:7] = np.array(cfg_init_state.rot)
+        self.data.qpos[7:] = self.dof_init_pose
+        self.data.qvel[:] = 0
+        
+    def __make_buffer(self):
+        self.history_handler = HistoryHandler(1, self.cfg.obs.obs_auxiliary, self.cfg.obs.obs_dims, self.device)
+        ...
+        
+    def __make_viewer(self):
+        ...
+        self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)
+        self.viewer.cam.lookat[:] = np.array([0,0,0.8])
+        self.viewer.cam.distance = 3.0        
+        self.viewer.cam.azimuth = 30                         # 可根据需要调整角度
+        self.viewer.cam.elevation = -30                      # 负值表示从上往下看
+        def _key_callback(window, key, scancode, action, mods):
+            if action == glfw.PRESS:
+                #  K L ; '
+                #  , . /
+                if key == glfw.KEY_COMMA:
+                    self.cmd[1] += 0.1
+                elif key == glfw.KEY_SLASH:
+                    self.cmd[1] -= 0.1
+                elif key == glfw.KEY_L: #
+                    self.cmd[0] += 0.1
+                elif key == glfw.KEY_PERIOD:
+                    self.cmd[0] -= 0.1
+                elif key == glfw.KEY_K:
+                    if HEADING_CMD:
+                        self.cmd[3] = wrap_to_pi_float(self.cmd[3]+np.pi/20)
+                    else:
+                        self.cmd[2] += 0.1
+                elif key == glfw.KEY_SEMICOLON:
+                    if HEADING_CMD:                            
+                        self.cmd[3] = wrap_to_pi_float(self.cmd[3]-np.pi/20)
+                    else:
+                        self.cmd[2] -= 0.1
+                elif key == glfw.KEY_APOSTROPHE:
+                    self.cmd = np.array(defcmd)
+                elif key == glfw.KEY_ENTER:
+                    # raise NotImplementedError("Not implemented")
+                    self.data.qpos[:3] = np.array(self.cfg.robot.init_state.pos)
+                    self.data.qpos[3:7] = np.array(self.cfg.robot.init_state.rot)
+                    self.data.qpos[7:] = self.dof_init_pose
+                    self.data.qvel[:]   = 0
+                print(self.cmd)
+            self.viewer._key_callback(window, key, scancode, action, mods)
+        glfw.set_key_callback(self.viewer.window, _key_callback)
+
+
+
+    @staticmethod
+    def pd_control(target_q, q, kp, target_dq, dq, kd):
+        '''Calculates torques from position commands
+        '''
+        # if MujocoRobot.RAND_NOISE:
+        #     kp,kd = MujocoRobot.mk_rand_noise(np.array([kp, kd]), MujocoRobot.noise_ratio)
+        return (target_q - q) * kp + (target_dq - dq) * kd
+
+    def GetState(self):
+        '''Extracts physical states from the mujoco data structure
+        '''
+        data = self.data
+        self.q = data.qpos.astype(np.double)[7:] # 19 dim
+            # 3 dim base pos + 4 dim quat + 12 dim actuation angles
+        self.dq = data.qvel.astype(np.double)[6:] # 18 dim ?????
+            # 3 dim base vel + 3 dim omega + 12 dim actuation vel
+        
+        self.pos = data.qpos.astype(np.double)[:3]
+        self.quat = data.qpos.astype(np.double)[3:7]
+        self.vel = data.qvel.astype(np.double)[:3]
+        self.omega = data.qvel.astype(np.double)[3:6]
+        
+        r = R.from_quat(self.quat)
+        self.rpy = quaternion_to_euler_array(self.quat)
+        self.rpy[self.rpy > math.pi] -= 2 * math.pi
+        self.gvec = r.apply(np.array([0., 0., -1.]), inverse=True).astype(np.double)
+    
+        
+        if HEADING_CMD:
+            self.cmd[2] = np.clip(0.5*wrap_to_pi_float(self.cmd[3] - self.rpy[2]), -1., 1.)
+            
+        # breakpoint()
+    
+        
+    def ApplyAction(self, target_q): 
+        for i in range(self.decimation):
+            self.GetState()
+            
+            tau = self.pd_control(target_q, self.q, self.kp,
+                            0, self.dq, self.kd)  # Calc torques
+            
+            # if self.RAND_NOISE: tau = MujocoRobot.mk_rand_noise(tau, MujocoRobot.noise_ratio)
+            tau = np.clip(tau, -self.tau_limit, self.tau_limit)  # Clamp torques
+            
+            
+            # self.print_torque(tau)
+            tau*=0
+            # tau[12:]*=0
+            # self.data.ctrl[:self.num_actions] = tau
+            print(np.linalg.norm(target_q-self.q), np.linalg.norm(tau))
+            # breakpoint()
+            self.data.ctrl = tau
+
+            mujoco.mj_step(self.model, self.data) # type: ignore
+            
+            if np.any(self.data.contact.pos[:,2] > 0.01):
+                names_list = self.model.names.decode('utf-8').split('\x00')[:40]
+                res = np.zeros((6,1),dtype=np.float64)
+                geom_name = lambda x: (names_list[self.model.geom_bodyid[x] + 1])
+                geom_force = lambda x:mujoco.mj_contactForce(self.model,self.data,x,res) #type:ignore
+                
+                for contact in self.data.contact:
+                    if contact.pos[2] > 0.01 and contact.geom1 != 0 and contact.geom2 != 0:
+                        geom1_name = geom_name(contact.geom1)
+                        geom2_name = geom_name(contact.geom2)
+                        print(f"Warning!!! Collision between '{geom1_name,contact.geom1}' and '{geom2_name,contact.geom2}' at position {contact.pos}.")
+                    
+                breakpoint()
+            if RENDER:
+                if self.viewer.is_alive:
+                    self.viewer.render()
+                else:
+                    raise Exception("Mujoco Robot Exit")
+
 
 
 @hydra.main(config_path="config", config_name="base_eval")
@@ -157,17 +399,27 @@ def main(override_config: OmegaConf):
                                 setup_simulator(config)
     
     pre_process_config(config)
-    # device = config.device
+    # device = config.get("device", "cuda:0" if torch.cuda.is_available() else "cpu")
     
-    if config.get("device", None):
-        device = config.device
-    else:
-        device = "cuda:0" if torch.cuda.is_available() else "cpu"
         
     # env = instantiate(config.env, device=device)
+    # algo: BaseAlgo = instantiate(config.algo, env=env, device=device, log_dir=None)
+    # algo.setup()
+    # algo.load(config.checkpoint)
     
     policy_fn = load_policy(config, checkpoint)
     
+    robot = MujocoRobot(config)
+    clip_action_limit = config.robot.control.action_clip_value
+    action_scale = config.robot.control.action_scale
+    dof_init_pose = robot.dof_init_pose
+    
+    while True:
+        # action = np.random.randn(robot.num_actions)*1e-4
+        action = np.zeros(robot.num_actions)
+        trg_q = np.clip(action, -clip_action_limit, clip_action_limit) * action_scale + dof_init_pose
+        
+        robot.ApplyAction(trg_q)
     # algo.evaluate_policy()
     
     breakpoint()
