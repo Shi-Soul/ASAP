@@ -116,7 +116,7 @@ class MujocoRobot:
         dof_init_pose = cfg_init_state.default_joint_angles
         dof_effort_limit_list = self.cfg.robot.dof_effort_limit_list
         
-        self.dof_init_pose = np.array([dof_init_pose[name] for name in self.dof_names]) *0
+        self.dof_init_pose = np.array([dof_init_pose[name] for name in self.dof_names])
         self.tau_limit = np.array(dof_effort_limit_list)
         
         
@@ -237,12 +237,13 @@ class MujocoRobot:
             
             
             # self.print_torque(tau)
-            # tau*=0.3
+            # tau*=0
             # tau[12:]*=0
             # self.data.ctrl[:self.num_actions] = tau
             print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
+            breakpoint()
             # breakpoint()
-            self.data.qpos[:3] = np.array([0,0,1])
+            # self.data.qpos[:3] = np.array([0,0,1])
             self.data.ctrl = tau
 
             mujoco.mj_step(self.model, self.data) # type: ignore
@@ -420,6 +421,7 @@ def main(override_config: OmegaConf):
     action_scale = config.robot.control.action_scale
     dof_init_pose = robot.dof_init_pose
     
+    breakpoint()
     while True:
         # action = np.random.randn(robot.num_actions)*1e-4
         action = np.zeros(robot.num_actions)
