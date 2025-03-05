@@ -140,6 +140,8 @@ class MujocoRobot:
         self.data.qpos[7:] = self.dof_init_pose
         self.data.qvel[:] = 0
         
+        breakpoint()
+        
     def __make_buffer(self):
         self.history_handler = HistoryHandler(1, self.cfg.obs.obs_auxiliary, self.cfg.obs.obs_dims, self.device)
         ...
@@ -227,16 +229,17 @@ class MujocoRobot:
             
             tau = self.pd_control(target_q, self.q, self.kp,
                             0, self.dq, self.kd)  # Calc torques
+            # breakpoint()
             
             # if self.RAND_NOISE: tau = MujocoRobot.mk_rand_noise(tau, MujocoRobot.noise_ratio)
             tau = np.clip(tau, -self.tau_limit, self.tau_limit)  # Clamp torques
             
             
             # self.print_torque(tau)
-            tau*=0
+            # tau*=0
             # tau[12:]*=0
             # self.data.ctrl[:self.num_actions] = tau
-            print(np.linalg.norm(target_q-self.q), np.linalg.norm(tau))
+            print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
             # breakpoint()
             self.data.ctrl = tau
 
@@ -254,7 +257,7 @@ class MujocoRobot:
                         geom2_name = geom_name(contact.geom2)
                         print(f"Warning!!! Collision between '{geom1_name,contact.geom1}' and '{geom2_name,contact.geom2}' at position {contact.pos}.")
                     
-                breakpoint()
+                # breakpoint()
             if RENDER:
                 if self.viewer.is_alive:
                     self.viewer.render()
