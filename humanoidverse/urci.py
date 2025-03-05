@@ -30,6 +30,7 @@ import logging
 from utils.config_utils import *  # noqa: E402, F403
 # add argparse arguments
 
+from typing import Dict
 from humanoidverse.utils.config_utils import *  # noqa: E402, F403
 from loguru import logger
 
@@ -39,6 +40,7 @@ import numpy as np
 
 
 np2torch = lambda x: torch.tensor(x, dtype=torch.float32)
+torch2np = lambda x: x.cpu().numpy()
 
 def wrap_to_pi_float(angles:float):
     angles %= 2*np.pi
@@ -107,6 +109,8 @@ class MujocoRobot:
         self.__make_init_pose()
         self.__make_buffer()
         self.GetState()
+        self.UpdateObs()
+        
         mujoco.mj_step(self.model, self.data) # type: ignore    
         if RENDER:
             self.__make_viewer()
@@ -163,6 +167,7 @@ class MujocoRobot:
         # breakpoint()
         
     def __make_buffer(self):
+        self.act = np.zeros(self.num_actions)
         self.history_handler = HistoryHandler(1, self.cfg.obs.obs_auxiliary, self.cfg.obs.obs_dims, self.device)
         ...
         
@@ -324,6 +329,11 @@ class MujocoRobot:
             self.history_handler.add(key, self.hist_obs_dict[key])
             
         # breakpoint()
+
+    @property
+    def Obs(self):
+        # return {k: torch2np(v) for k, v in self.obs_buf_dict.items()}
+        return {'actor_obs': torch2np(self.obs_buf_dict['actor_obs']).reshape(1, -1)}
 
     ######################### Observations #########################
     def _get_obs_command_lin_vel(self):
@@ -514,11 +524,13 @@ def main(override_config: OmegaConf):
         try_inferr = session.run([output_name], {input_name: example_input})
         assert try_inferr[0].shape == (1, action_dim), f"Action shape {try_inferr[0].shape} does not match expected shape (1, {action_dim})."
         
-        def policy_fn(obs: np.ndarray) -> np.ndarray:
-            assert obs.shape == (1, actor_dim), f"Observation shape {obs.shape} does not match expected shape (1, {actor_dim})."
-            result = session.run([output_name], {input_name: obs})
+        def policy_fn(obs_dict: Dict[str, np.ndarray]) -> np.ndarray:
+            # assert obs.shape == (1, actor_dim), f"Observation shape {obs.shape} does not match expected shape (1, {actor_dim})."
+            result = session.run([output_name], obs_dict)
+            # obs = obs_dict[input_name]
+            # result = session.run([output_name], {input_name: obs_dict})
+            # result = session.run([output_name], {input_name: obs})
             return result[0]
-        
         return policy_fn
         
     
@@ -547,8 +559,9 @@ def main(override_config: OmegaConf):
     
     # breakpoint()
     while True:
+        action = policy_fn(robot.Obs)[0]
         # action = np.random.randn(robot.num_actions)*1e-4
-        action = np.zeros(robot.num_actions)
+        # action = np.zeros(robot.num_actions)
         # trg_q = np.clip(action, -clip_action_limit, clip_action_limit) * action_scale + dof_init_pose
         
         robot.ApplyAction(action)
