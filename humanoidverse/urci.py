@@ -635,7 +635,7 @@ def main(override_config: OmegaConf):
     
     policy_fn = load_policy(config, checkpoint)
     
-    robot = MujocoRobot(config)
+    robot:URCIRobot = MujocoRobot(config)
     
     # breakpoint()
     while True:
