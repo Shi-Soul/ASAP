@@ -25,10 +25,10 @@ from humanoidverse.utils.real.rotation_helper import get_gravity_orientation, tr
 from humanoidverse.utils.real.remote_controller import RemoteController, KeyMap
 
 
+from ..urcirobot import URCIRobot
 
 
-
-class RealRobot():
+class RealRobot(URCIRobot):
     ...
 
 
