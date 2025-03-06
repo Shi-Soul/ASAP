@@ -71,8 +71,8 @@ def quaternion_to_euler_array(quat):
 
 class MujocoRobot:
     ACT_EMA: bool = False # Noise
-    RAND_NOISE: bool = True
-    RAND_DELAY: bool = True
+    RAND_NOISE: bool = False
+    RAND_DELAY: bool = False
     RAND_MASK : bool = False
     
     ema_alpha = 0.1  # EMA smoothing factor
@@ -97,7 +97,8 @@ class MujocoRobot:
         
         
         # self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
-        self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist_phys.xml')
+        # self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist_phys.xml')
+        self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1_asap/g1_29dof_anneal_23dof.xml')
         self.data = mujoco.MjData(self.model) # type: ignore
         self.model.opt.timestep = self.sim_dt
         
@@ -108,10 +109,10 @@ class MujocoRobot:
         
         self.__make_init_pose()
         self.__make_buffer()
-        # self.GetState()
-        # self.UpdateObs()
+        self.GetState()
+        self.UpdateObs()
         
-        # mujoco.mj_step(self.model, self.data) # type: ignore    
+        mujoco.mj_step(self.model, self.data) # type: ignore    
         if RENDER:
             self.__make_viewer()
 
@@ -134,9 +135,6 @@ class MujocoRobot:
         self.kd = np.zeros(self.num_dofs)
         
         
-# kps: [100, 100, 100, 150, 40, 40, 100, 100, 100, 150, 40, 40]
-# kds: [2, 2, 2, 4, 2, 2, 2, 2, 2, 4, 2, 2]
-        
         for i in range(self.num_dofs):
             name = self.dof_names[i]
             found = False
@@ -149,22 +147,11 @@ class MujocoRobot:
             if not found:
                 raise ValueError(f"PD gain of joint {name} were not defined. Should be defined in the yaml file.")
         
-        # self.kp[:15] = np.array([100, 100, 100, 150, 40, 40, 
-        #                          100, 100, 100, 150, 40, 40,
-        #                          200,200,200])
-        # self.kd[:15] = np.array([2, 2, 2, 4, 0.5, 0.5, 
-        #                          2, 2, 2, 4, 0.5, 0.5,
-        #                          1,1,1])* 0.2
-        # self.kp[15:] = 30
-        # self.kd[15:] = 0.5
-        
         
         self.data.qpos[:3] = np.array(cfg_init_state.pos).copy()
         self.data.qpos[3:7] = np.array(cfg_init_state.rot).copy()
         self.data.qpos[7:] = self.dof_init_pose.copy()
         self.data.qvel[:] = 0
-        
-        # breakpoint()
         
     def __make_buffer(self):
         self.act = np.zeros(self.num_actions)
@@ -253,12 +240,10 @@ class MujocoRobot:
         target_q = np.clip(action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
         
         for i in range(self.decimation):
-            # breakpoint()
             self.GetState()
             
             tau = self.pd_control(target_q, self.q, self.kp,
                             0, self.dq, self.kd)  # Calc torques
-            # breakpoint()
             
             # if self.RAND_NOISE: tau = MujocoRobot.mk_rand_noise(tau, MujocoRobot.noise_ratio)
             tau = np.clip(tau, -self.tau_limit, self.tau_limit)  # Clamp torques
@@ -266,11 +251,7 @@ class MujocoRobot:
             
             # self.print_torque(tau)
             # tau*=0
-            # tau[12:]*=0
-            # self.data.ctrl[:self.num_actions] = tau
-            print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
-            # breakpoint()
-            # breakpoint()
+            # print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
             # self.data.qpos[:3] = np.array([0,0,1])
             self.data.ctrl[:] = tau
 
@@ -547,12 +528,6 @@ def main(override_config: OmegaConf):
     pre_process_config(config)
     # device = config.get("device", "cuda:0" if torch.cuda.is_available() else "cpu")
     
-        
-    # env = instantiate(config.env, device=device)
-    # algo: BaseAlgo = instantiate(config.algo, env=env, device=device, log_dir=None)
-    # algo.setup()
-    # algo.load(config.checkpoint)
-    
     policy_fn = load_policy(config, checkpoint)
     
     robot = MujocoRobot(config)
@@ -560,15 +535,10 @@ def main(override_config: OmegaConf):
     # breakpoint()
     while True:
         # action = policy_fn(robot.Obs)[0]
-        # action = np.random.randn(robot.num_actions)*1e-4
         action = np.zeros(robot.num_actions)
-        # trg_q = np.clip(action, -clip_action_limit, clip_action_limit) * action_scale + dof_init_pose
         
-        # print(action)
         robot.ApplyAction(action)
-    # algo.evaluate_policy()
     
-    breakpoint()
     
 if __name__ == "__main__":
     main()
