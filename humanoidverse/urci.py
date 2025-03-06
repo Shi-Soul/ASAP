@@ -167,8 +167,12 @@ class MujocoRobot:
         self.viewer.cam.elevation = -30                      # 负值表示从上往下看
         def _key_callback(window, key, scancode, action, mods):
             if action == glfw.PRESS:
-                #  K L ; '
-                #  , . /
+                #  Keyboard mapping:
+                #  ----------------
+                #  |   K L ; '    |
+                #  |   , . /      |
+                #  ----------------
+
                 if key == glfw.KEY_COMMA:
                     self.cmd[1] += 0.1
                 elif key == glfw.KEY_SLASH:
@@ -195,6 +199,12 @@ class MujocoRobot:
                     self.data.qpos[3:7] = np.array(self.cfg.robot.init_state.rot)
                     self.data.qpos[7:] = self.dof_init_pose
                     self.data.qvel[:]   = 0
+                    
+                    self.act[:] = 0
+                    self.history_handler.reset([0])
+                    self.GetState()
+                    self.UpdateObs()
+                    
                 print(self.cmd)
             self.viewer._key_callback(window, key, scancode, action, mods)
         glfw.set_key_callback(self.viewer.window, _key_callback)

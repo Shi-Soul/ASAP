@@ -56,10 +56,6 @@ class LeggedRobotMotionTracking(LeggedRobotBase):
             self.terminate_when_motion_far_threshold = self.config.termination_scales.termination_motion_far_threshold
             logger.info(f"Terminate when motion far threshold: {self.terminate_when_motion_far_threshold}")
 
-
-
-        
-
     def teleop_callback(self, msg):
         self.teleop_marker_coords = torch.tensor(msg.data, device=self.device)
 

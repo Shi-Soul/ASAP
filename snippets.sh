@@ -3,7 +3,7 @@ HYDRA_FULL_ERROR=1 python humanoidverse/eval_agent.py +checkpoint=xxx/xxxx/model
 
 # Locomotion
 
-HYDRA_FULL_ERROR=1 python humanoidverse/train_agent.py \
+python humanoidverse/train_agent.py \
 +simulator=isaacgym \
 +exp=locomotion \
 +domain_rand=dr_wjx \
