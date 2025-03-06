@@ -39,7 +39,7 @@ wandb/
 # other
 *.egg-info
 __pycache__
-unitree_sdk2_python
+# unitree_sdk2_python
 roboverse/data/motions
 *.pkl
 *.pt
