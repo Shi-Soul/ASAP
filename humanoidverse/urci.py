@@ -72,7 +72,24 @@ def quaternion_to_euler_array(quat):
     # Returns roll, pitch, yaw in a NumPy array in radians
     return np.array([roll_x, pitch_y, yaw_z])
 
-class MujocoRobot:
+class URCIRobot:
+    def __init__(self, cfg:OmegaConf):
+        raise NotImplementedError("Not implemented")
+    
+    def Reset(self):
+        raise NotImplementedError("Not implemented")
+    
+    def ApplyAction(self, action:np.ndarray):
+        raise NotImplementedError("Not implemented")
+    
+    def GetState(self):
+        raise NotImplementedError("Not implemented")
+    
+    def Obs(self)->Dict[str, np.ndarray]:
+        raise NotImplementedError("Not implemented")
+    
+    
+class MujocoRobot(URCIRobot):
     ACT_EMA: bool = False # Noise
     RAND_NOISE: bool = False
     RAND_DELAY: bool = False
