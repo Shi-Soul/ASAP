@@ -24,6 +24,7 @@ from hydra.core.config_store import ConfigStore
 from omegaconf import OmegaConf
 from humanoidverse.utils.logging import HydraLoggerBridge
 from humanoidverse.envs.env_utils.history_handler import HistoryHandler
+from humanoidverse.utils.motion_lib.motion_lib_robot import MotionLibRobot
 from humanoidverse.utils.helpers import parse_observation
 from scipy.spatial.transform import Rotation as R
 import logging
@@ -85,12 +86,14 @@ class MujocoRobot:
     print_torque = lambda tau: print(f"tau (norm, max) = {np.linalg.norm(tau):.2f}, \t{np.max(tau):.2f}", end='\r')
     
     def __init__(self, cfg):
-        self.cfg = cfg
+        self.cfg:OmegaConf = cfg
         self.device="cpu"
         
         self.decimation = cfg.simulator.config.sim.control_decimation
         self.sim_dt = 1/cfg.simulator.config.sim.fps
         self.dt = self.decimation * self.sim_dt
+        self.subtimer = 0
+        
         self.clip_action_limit = cfg.robot.control.action_clip_value
         self.clip_observations = cfg.env.config.normalization.clip_observations
         self.action_scale = cfg.robot.control.action_scale
@@ -107,8 +110,18 @@ class MujocoRobot:
         self.num_ctrl = self.data.ctrl.shape[0]
         assert self.num_ctrl == self.num_actions, f"Number of control DOFs {self.num_ctrl} does not match number of actions {self.num_actions}"
         
+        logger.info("Initializing Mujoco Robot")
+        logger.info("Task Name: {}".format(cfg.log_task_name))
+        logger.info("Robot Type: {}".format(cfg.robot.asset.robot_type))
+        
         self.__make_init_pose()
         self.__make_buffer()
+        if cfg.log_task_name == "motion_tracking":
+            self.is_motion_tracking = True
+            self.__make_motionlib()
+        else:
+            self.is_motion_tracking = False
+        
         self.GetState()
         self.UpdateObs()
         
@@ -158,6 +171,16 @@ class MujocoRobot:
         self.history_handler = HistoryHandler(1, self.cfg.obs.obs_auxiliary, self.cfg.obs.obs_dims, self.device)
         ...
         
+    def __make_motionlib(self):
+        self.cfg.robot.motion.step_dt = self.dt
+        self._motion_lib = MotionLibRobot(self.cfg.robot.motion, num_envs=1, device=self.device)
+        self._motion_lib.load_motions(random_sample=False)
+        
+        self._motion_id = 0
+        self.motion_len = self._motion_lib.get_motion_length(self._motion_id)
+        # breakpoint()
+        ...
+        
     def __make_viewer(self):
         ...
         self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)
@@ -194,22 +217,26 @@ class MujocoRobot:
                 elif key == glfw.KEY_APOSTROPHE:
                     self.cmd = np.array(defcmd)
                 elif key == glfw.KEY_ENTER:
-                    # raise NotImplementedError("Not implemented")
-                    self.data.qpos[:3] = np.array(self.cfg.robot.init_state.pos)
-                    self.data.qpos[3:7] = np.array(self.cfg.robot.init_state.rot)
-                    self.data.qpos[7:] = self.dof_init_pose
-                    self.data.qvel[:]   = 0
-                    
-                    self.act[:] = 0
-                    self.history_handler.reset([0])
-                    self.GetState()
-                    self.UpdateObs()
-                    
+                    self.Reset()
                 print(self.cmd)
             self.viewer._key_callback(window, key, scancode, action, mods)
         glfw.set_key_callback(self.viewer.window, _key_callback)
 
+    def Reset(self):
+        # raise NotImplementedError("Not implemented")
+        self.data.qpos[:3] = np.array(self.cfg.robot.init_state.pos)
+        self.data.qpos[3:7] = np.array(self.cfg.robot.init_state.rot)
+        self.data.qpos[7:] = self.dof_init_pose
+        self.data.qvel[:]   = 0
+        
+        self.act[:] = 0
+        self.history_handler.reset([0])
 
+        self.subtimer = 0
+        
+        self.GetState()
+        self.UpdateObs()
+        ...
 
     @staticmethod
     def pd_control(target_q, q, kp, target_dq, dq, kd):
@@ -241,6 +268,10 @@ class MujocoRobot:
         
         if HEADING_CMD:
             self.cmd[2] = np.clip(0.5*wrap_to_pi_float(self.cmd[3] - self.rpy[2]), -1., 1.)
+            
+        if self.is_motion_tracking:
+            self.motion_time = (self.subtimer/self.decimation) * self.dt 
+            self.ref_motion_phase = self.motion_time / self.motion_len
             
         # breakpoint()
     
@@ -285,6 +316,7 @@ class MujocoRobot:
                     self.viewer.render()
                 else:
                     raise Exception("Mujoco Robot Exit")
+            self.subtimer += 1
 
         self.UpdateObs()
 
@@ -295,6 +327,7 @@ class MujocoRobot:
         
         noise_extra_scale = 1.
         for obs_key, obs_config in self.cfg.obs.obs_dict.items():
+            if not obs_key=='actor_obs': continue
             self.obs_buf_dict_raw[obs_key] = dict()
 
             parse_observation(self, obs_config, self.obs_buf_dict_raw[obs_key], self.cfg.obs.obs_scales, self.cfg.obs.noise_scales, noise_extra_scale)
@@ -307,6 +340,7 @@ class MujocoRobot:
         self.obs_buf_dict = dict()
         
         for obs_key, obs_config in self.cfg.obs.obs_dict.items():
+            if not obs_key=='actor_obs': continue
             obs_keys = sorted(obs_config)
             # print("obs_keys", obs_keys)            
             self.obs_buf_dict[obs_key] = torch.cat([self.obs_buf_dict_raw[obs_key][key] for key in obs_keys], dim=-1)
@@ -314,6 +348,7 @@ class MujocoRobot:
             
         clip_obs = self.clip_observations
         for obs_key, obs_val in self.obs_buf_dict.items():
+            if not obs_key=='actor_obs': continue
             self.obs_buf_dict[obs_key] = torch.clip(obs_val, -clip_obs, clip_obs)
 
         for key in self.history_handler.history.keys():
@@ -359,6 +394,23 @@ class MujocoRobot:
     def _get_obs_dof_vel(self,):
         return np2torch(self.dq)
     
+    
+    def _get_obs_ref_motion_phase(self):
+        logger.info(f"Phase: {self.ref_motion_phase}")
+        return torch.tensor(self.ref_motion_phase).reshape(1,)
+    
+    def _get_obs_dif_local_rigid_body_pos(self):
+        raise NotImplementedError("Not implemented")
+        return self._obs_dif_local_rigid_body_pos
+    
+    def _get_obs_local_ref_rigid_body_pos(self):
+        raise NotImplementedError("Not implemented")
+        return self._obs_local_ref_rigid_body_pos
+    
+    def _get_obs_vr_3point_pos(self):
+        raise NotImplementedError("Not implemented")
+        return self._obs_vr_3point_pos
+    
     def _get_obs_history(self,):
         assert "history" in self.cfg.obs.obs_auxiliary.keys()
         history_config = self.cfg.obs.obs_auxiliary['history']
@@ -395,6 +447,29 @@ class MujocoRobot:
             history_tensors.append(history_tensor)
         return torch.cat(history_tensors, dim=1).reshape(-1)
     
+    def _get_obs_history_actor(self,):
+        assert "history_actor" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['history_actor']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
+    
+    def _get_obs_history_critic(self,):
+        assert "history_critic" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['history_critic']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
 
 from wjxtools import pdb_decorator
 @hydra.main(config_path="config", config_name="base_eval")
@@ -489,6 +564,7 @@ def main(override_config: OmegaConf):
         ckpt_num = config.checkpoint.split('/')[-1].split('_')[-1].split('.')[0]
         config.env.config.save_rendering_dir = str(checkpoint.parent / "renderings" / f"ckpt_{ckpt_num}")
         config.env.config.ckpt_dir = str(checkpoint.parent) # commented out for now, might need it back to save motion
+        OmegaConf.set_struct(config, False)
         
         return config, checkpoint
     
