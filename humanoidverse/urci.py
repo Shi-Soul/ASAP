@@ -496,34 +496,23 @@ def main(override_config: OmegaConf):
         os.chdir(hydra.utils.get_original_cwd())
         
     def setup_simulator(config: OmegaConf):    
-        simulator_type = config.simulator['_target_'].split('.')[-1]
-        if simulator_type == 'IsaacSim':
-            from omni.isaac.lab.app import AppLauncher
-            import argparse
-            parser = argparse.ArgumentParser(description="Evaluate an RL agent with RSL-RL.")
-            AppLauncher.add_app_launcher_args(parser)
-            
-            args_cli, hydra_args = parser.parse_known_args()
-            sys.argv = [sys.argv[0]] + hydra_args
-            args_cli.num_envs = config.num_envs
-            args_cli.seed = config.seed
-            args_cli.env_spacing = config.env.config.env_spacing
-            args_cli.output_dir = config.output_dir
-            args_cli.headless = config.headless
-
-            
-            app_launcher = AppLauncher(args_cli)
-            simulation_app = app_launcher.app
-        if simulator_type == 'IsaacGym':
-            import isaacgym
-            
-            
+        # simulator_type = config.simulator['_target_'].split('.')[-1]
+        simulator_type = config.simulator.config.name
+        
+        if simulator_type == 'real':
+            from humanoidverse.deploy.real import RealRobot
+            RobotCls = RealRobot
+        elif simulator_type == 'mujoco':
+            RobotCls = MujocoRobot
+        else:
+            raise NotImplementedError(f"Simulator type {simulator_type} not implemented")
+        
         from humanoidverse.agents.base_algo.base_algo import BaseAlgo  # noqa: E402
         from humanoidverse.utils.helpers import pre_process_config
         import torch
         from humanoidverse.utils.inference_helpers import export_policy_as_jit, export_policy_as_onnx, export_policy_and_estimator_as_onnx
 
-        return BaseAlgo, pre_process_config, torch, export_policy_as_jit, export_policy_as_onnx, export_policy_and_estimator_as_onnx
+        return RobotCls, BaseAlgo, pre_process_config, torch, export_policy_as_jit, export_policy_as_onnx, export_policy_and_estimator_as_onnx
         
     def get_config(override_config: OmegaConf):
     
@@ -611,7 +600,7 @@ def main(override_config: OmegaConf):
     
     setup_logging2(config)
     
-    BaseAlgo, pre_process_config, torch, \
+    RobotCls, BaseAlgo, pre_process_config, torch, \
         export_policy_as_jit, export_policy_as_onnx, export_policy_and_estimator_as_onnx = \
                                 setup_simulator(config)
     
@@ -620,7 +609,7 @@ def main(override_config: OmegaConf):
     
     policy_fn = load_policy(config, checkpoint)
     
-    robot:URCIRobot = MujocoRobot(config)
+    robot:URCIRobot = RobotCls(config)
     
     # breakpoint()
     while True:

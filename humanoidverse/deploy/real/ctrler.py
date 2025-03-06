@@ -24,11 +24,30 @@ from humanoidverse.utils.real.command_helper import create_damping_cmd, create_z
 from humanoidverse.utils.real.rotation_helper import get_gravity_orientation, transform_imu_data
 from humanoidverse.utils.real.remote_controller import RemoteController, KeyMap
 
+from typing import Dict
+import numpy as np
+from omegaconf import OmegaConf
+
 
 from ..urcirobot import URCIRobot
 
 
 class RealRobot(URCIRobot):
+    def __init__(self, cfg: OmegaConf):
+        raise NotImplementedError("Not implemented")
+    
+    def Reset(self):
+        raise NotImplementedError("Not implemented")
+    
+    def ApplyAction(self, action:np.ndarray):
+        raise NotImplementedError("Not implemented")
+    
+    def GetState(self):
+        raise NotImplementedError("Not implemented")
+    
+    def Obs(self)->Dict[str, np.ndarray]:
+        raise NotImplementedError("Not implemented")
+    
     ...
 
 
