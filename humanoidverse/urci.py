@@ -98,8 +98,8 @@ class MujocoRobot:
         
         # self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
         self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist_phys.xml')
-        self.model.opt.timestep = self.dt
         self.data = mujoco.MjData(self.model) # type: ignore
+        self.model.opt.timestep = self.sim_dt
         
         self.cmd = np.array(defcmd)
         self.num_actions = cfg.robot.actions_dim
@@ -108,10 +108,10 @@ class MujocoRobot:
         
         self.__make_init_pose()
         self.__make_buffer()
-        self.GetState()
-        self.UpdateObs()
+        # self.GetState()
+        # self.UpdateObs()
         
-        mujoco.mj_step(self.model, self.data) # type: ignore    
+        # mujoco.mj_step(self.model, self.data) # type: ignore    
         if RENDER:
             self.__make_viewer()
 
@@ -159,9 +159,9 @@ class MujocoRobot:
         # self.kd[15:] = 0.5
         
         
-        self.data.qpos[:3] = np.array(cfg_init_state.pos)
-        self.data.qpos[3:7] = np.array(cfg_init_state.rot)
-        self.data.qpos[7:] = self.dof_init_pose
+        self.data.qpos[:3] = np.array(cfg_init_state.pos).copy()
+        self.data.qpos[3:7] = np.array(cfg_init_state.rot).copy()
+        self.data.qpos[7:] = self.dof_init_pose.copy()
         self.data.qvel[:] = 0
         
         # breakpoint()
@@ -249,11 +249,11 @@ class MujocoRobot:
     
         
     def ApplyAction(self, action): 
-        self.act = action
+        self.act = action.copy()
         target_q = np.clip(action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
         
-        
         for i in range(self.decimation):
+            # breakpoint()
             self.GetState()
             
             tau = self.pd_control(target_q, self.q, self.kp,
@@ -268,11 +268,11 @@ class MujocoRobot:
             # tau*=0
             # tau[12:]*=0
             # self.data.ctrl[:self.num_actions] = tau
-            # print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
+            print(np.linalg.norm(target_q-self.q), np.linalg.norm(self.dq), np.linalg.norm(tau))
             # breakpoint()
             # breakpoint()
             # self.data.qpos[:3] = np.array([0,0,1])
-            self.data.ctrl = tau
+            self.data.ctrl[:] = tau
 
             mujoco.mj_step(self.model, self.data) # type: ignore
             
@@ -559,12 +559,12 @@ def main(override_config: OmegaConf):
     
     # breakpoint()
     while True:
-        action = policy_fn(robot.Obs)[0]
+        # action = policy_fn(robot.Obs)[0]
         # action = np.random.randn(robot.num_actions)*1e-4
-        # action = np.zeros(robot.num_actions)
+        action = np.zeros(robot.num_actions)
         # trg_q = np.clip(action, -clip_action_limit, clip_action_limit) * action_scale + dof_init_pose
         
-        print(action)
+        # print(action)
         robot.ApplyAction(action)
     # algo.evaluate_policy()
     
