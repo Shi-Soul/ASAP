@@ -28,6 +28,7 @@ class URCIRobot:
         self.dof_names = self.cfg.robot.dof_names
         self.num_bodies = len(self.body_names)
         self.num_dofs = len(self.dof_names)
+        assert self.num_dofs == 23, "Only 23 dofs are supported for now"
         
         
         dof_init_pose = cfg_init_state.default_joint_angles

@@ -36,6 +36,11 @@ from loguru import logger
 from ..urcirobot import URCIRobot
 
 class LowLevelMagic:
+    low_state: LowStateHG
+    low_cmd: LowCmdHG
+    joystick: RemoteController
+    
+    
     def __init__(self, cfg: OmegaConf):
         config = cfg.deploy
         self.joystick = RemoteController()
@@ -106,12 +111,17 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.dt = cfg.deploy.ctrl_dt
         self.timer = 0
         
+        self.num_real_dofs = len(self.low_cmd.motor_cmd)
         self.num_actions = cfg.robot.actions_dim
         self.cmd = np.array([0, 0, 0, 0])
+        assert self.num_real_dofs == 29, "Only 29 dofs are supported for now"
         
         self.clip_action_limit = cfg.robot.control.action_clip_value
         self.clip_observations = cfg.env.config.normalization.clip_observations
         self.action_scale = cfg.robot.control.action_scale
+        self.dof_idx_23_to_29 = cfg.deploy.dof_idx_23_to_29
+        self.locked_kp = cfg.deploy.locked_kp
+        self.locked_kd = cfg.deploy.locked_kd
         
         logger.info("Initializing **Real** Robot")
         logger.info("Task Name: {}".format(cfg.log_task_name))
@@ -127,10 +137,15 @@ class RealRobot(URCIRobot, LowLevelMagic):
         
         super().__init__(cfg)
         
-        
+        self.Reset()
         raise NotImplementedError("Not implemented")
     
     def Reset(self):
+        self.zero_torque_state()
+        self.move_to_default_pos()
+        self.default_pos_state()
+        self.lock_state()
+        
         raise NotImplementedError("Not implemented")
     
     def ApplyAction(self, action:np.ndarray):
@@ -181,14 +196,38 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.history_handler.add(key, self.hist_obs_dict[key])
             
     # TODO:
-    def zero_torque_state(self):
+    
+    def SetMotorByPose(self, pose: np.ndarray):
+        assert pose.shape == (self.num_dofs,)
+        
+        for i,j in enumerate(self.dof_idx_23_to_29):
+            self.low_cmd.motor_cmd[j].q = pose[i]
+            self.low_cmd.motor_cmd[j].qd = 0
+            self.low_cmd.motor_cmd[j].kp = self.kp[i]
+            self.low_cmd.motor_cmd[j].kd = self.kd[i]
+            self.low_cmd.motor_cmd[j].tau = 0
+        self.send_cmd(self.low_cmd)
+        
         raise NotImplementedError("Not implemented")
+    
+    def zero_torque_state(self):
+        # raise NotImplementedError("Not implemented")
         print("Enter zero torque state.")
         print("Waiting for the start signal...")
         while self.joystick.button[KeyMap.start] != 1:
             create_zero_cmd(self.low_cmd)
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
+            
+    def lock_state(self):
+        for j in range(self.num_real_dofs):
+            # self.low_cmd.motor_cmd[j].mode = 1
+            self.low_cmd.motor_cmd[j].q = self.low_state.motor_state[j].q
+            self.low_cmd.motor_cmd[j].dq = 0
+            self.low_cmd.motor_cmd[j].tau = 0
+            self.low_cmd.motor_cmd[j].kp = self.locked_kp
+            self.low_cmd.motor_cmd[j].kd = self.locked_kd
+        self.send_cmd(self.low_cmd)
 
     def move_to_default_pos(self):
         raise NotImplementedError("Not implemented")
