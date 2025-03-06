@@ -28,6 +28,7 @@ from humanoidverse.utils.logging import HydraLoggerBridge
 from humanoidverse.envs.env_utils.history_handler import HistoryHandler
 from humanoidverse.utils.motion_lib.motion_lib_robot import MotionLibRobot
 from humanoidverse.utils.helpers import parse_observation
+from humanoidverse.deploy import URCIRobot
 from scipy.spatial.transform import Rotation as R
 import logging
 from utils.config_utils import *  # noqa: E402, F403
@@ -72,23 +73,7 @@ def quaternion_to_euler_array(quat):
     # Returns roll, pitch, yaw in a NumPy array in radians
     return np.array([roll_x, pitch_y, yaw_z])
 
-class URCIRobot:
-    def __init__(self, cfg:OmegaConf):
-        raise NotImplementedError("Not implemented")
-    
-    def Reset(self):
-        raise NotImplementedError("Not implemented")
-    
-    def ApplyAction(self, action:np.ndarray):
-        raise NotImplementedError("Not implemented")
-    
-    def GetState(self):
-        raise NotImplementedError("Not implemented")
-    
-    def Obs(self)->Dict[str, np.ndarray]:
-        raise NotImplementedError("Not implemented")
-    
-    
+
 class MujocoRobot(URCIRobot):
     ACT_EMA: bool = False # Noise
     RAND_NOISE: bool = False
