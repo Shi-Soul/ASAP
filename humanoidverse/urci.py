@@ -96,9 +96,9 @@ class MujocoRobot:
         self.action_scale = cfg.robot.control.action_scale
         
         
-        # self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
+        self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
         # self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist_phys.xml')
-        self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1_asap/g1_29dof_anneal_23dof.xml')
+        # self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1_asap/g1_29dof_anneal_23dof.xml')
         self.data = mujoco.MjData(self.model) # type: ignore
         self.model.opt.timestep = self.sim_dt
         
@@ -534,8 +534,8 @@ def main(override_config: OmegaConf):
     
     # breakpoint()
     while True:
-        # action = policy_fn(robot.Obs)[0]
-        action = np.zeros(robot.num_actions)
+        action = policy_fn(robot.Obs)[0]
+        # action = np.zeros(robot.num_actions)
         
         robot.ApplyAction(action)
     
