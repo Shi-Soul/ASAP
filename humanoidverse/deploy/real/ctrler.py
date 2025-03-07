@@ -5,7 +5,7 @@
 
 
 
-from typing import Union
+from typing import Union, List
 import numpy as np
 import time
 import torch
@@ -34,6 +34,9 @@ from loguru import logger
 
 
 from ..urcirobot import URCIRobot
+np2torch = lambda x: torch.tensor(x, dtype=torch.float32)
+torch2np = lambda x: x.cpu().numpy()
+
 
 class LowLevelMagic:
     low_state: LowStateHG
@@ -99,29 +102,86 @@ class LowLevelMagic:
         print("Successfully connected to the robot.")
         
     def send_cmd(self, cmd: Union[LowCmdGo, LowCmdHG]):
+        raise NotImplementedError("TODO: add sanity check")
         cmd.crc = CRC().Crc(cmd)
         self.lowcmd_publisher_.Write(cmd)
+
+
+    # @dataclass
+    # @annotate.final
+    # @annotate.autoid("sequential")
+    # class LowCmd_(idl.IdlStruct, typename="unitree_hg.msg.dds_.LowCmd_"):
+    #     mode_pr: types.uint8
+    #     mode_machine: types.uint8
+    #     motor_cmd: types.array['unitree_sdk2py.idl.unitree_hg.msg.dds_.MotorCmd_', 35]
+    #     reserve: types.array[types.uint32, 4]
+    #     crc: types.uint32
+    
+    
+    # @dataclass
+    # @annotate.final
+    # @annotate.autoid("sequential")
+    # class MotorCmd_(idl.IdlStruct, typename="unitree_hg.msg.dds_.MotorCmd_"):
+    #     mode: types.uint8
+    #     q: types.float32
+    #     dq: types.float32
+    #     tau: types.float32
+    #     kp: types.float32
+    #     kd: types.float32
+    #     reserve: types.uint32
+    
+    # 
+    # @dataclass
+    # @annotate.final
+    # @annotate.autoid("sequential")
+    # class LowState_(idl.IdlStruct, typename="unitree_hg.msg.dds_.LowState_"):
+    #     version: types.array[types.uint32, 2]
+    #     mode_pr: types.uint8
+    #     mode_machine: types.uint8
+    #     tick: types.uint32
+    #     imu_state: 'unitree_sdk2py.idl.unitree_hg.msg.dds_.IMUState_'
+    #     motor_state: types.array['unitree_sdk2py.idl.unitree_hg.msg.dds_.MotorState_', 35]
+    #     wireless_remote: types.array[types.uint8, 40]
+    #     reserve: types.array[types.uint32, 4]
+    #     crc: types.uint32
+
+
+    # @dataclass
+    # @annotate.final
+    # @annotate.autoid("sequential")
+    # class MotorState_(idl.IdlStruct, typename="unitree_hg.msg.dds_.MotorState_"):
+    #     mode: types.uint8
+    #     q: types.float32
+    #     dq: types.float32
+    #     ddq: types.float32
+    #     tau_est: types.float32
+    #     temperature: types.array[types.int16, 2]
+    #     vol: types.float32
+    #     sensor: types.array[types.uint32, 2]
+    #     motorstate: types.uint32
+    #     reserve: types.array[types.uint32, 4]
+
 
 
 class RealRobot(URCIRobot, LowLevelMagic):
     def __init__(self, cfg: OmegaConf):
         
-        self.cfg = cfg
-        self.device = "cpu"
-        self.dt = cfg.deploy.ctrl_dt
-        self.timer = 0
+        self.cfg: OmegaConf = cfg
+        self.device: str = "cpu"
+        self.dt: float = cfg.deploy.ctrl_dt
+        self.timer: int = 0
         
-        self.num_real_dofs = len(self.low_cmd.motor_cmd)
-        self.num_actions = cfg.robot.actions_dim
-        self.cmd = np.array([0, 0, 0, 0])
+        self.num_real_dofs: int = len(self.low_cmd.motor_cmd)
+        self.cmd: np.ndarray = np.array([0, 0, 0, 0])
         assert self.num_real_dofs == 29, "Only 29 dofs are supported for now"
         
-        self.clip_action_limit = cfg.robot.control.action_clip_value
-        self.clip_observations = cfg.env.config.normalization.clip_observations
-        self.action_scale = cfg.robot.control.action_scale
-        self.dof_idx_23_to_29 = cfg.deploy.dof_idx_23_to_29
-        self.locked_kp = cfg.deploy.locked_kp
-        self.locked_kd = cfg.deploy.locked_kd
+        self.clip_action_limit: float = cfg.robot.control.action_clip_value
+        self.clip_observations: float = cfg.env.config.normalization.clip_observations
+        self.action_scale: float = cfg.robot.control.action_scale
+        self.dof_idx_23_to_29: List[int] = cfg.deploy.dof_idx_23_to_29
+        self.dof_idx_locked: List[int] = [i for i in range(23, 29) if i not in self.dof_idx_23_to_29]
+        self.locked_kp: float = cfg.deploy.locked_kp
+        self.locked_kd: float = cfg.deploy.locked_kd
         
         logger.info("Initializing **Real** Robot")
         logger.info("Task Name: {}".format(cfg.log_task_name))
@@ -130,35 +190,38 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self._make_init_pose()
         self._make_buffer()
         if cfg.log_task_name == "motion_tracking":
-            self.is_motion_tracking = True
+            self.is_motion_tracking: bool = True
             self._make_motionlib()
         else:
-            self.is_motion_tracking = False
+            self.is_motion_tracking: bool = False
         
         super().__init__(cfg)
         
         self.Reset()
         raise NotImplementedError("Not implemented")
     
-    def Reset(self):
-        self.zero_torque_state()
-        self.move_to_default_pos()
-        self.default_pos_state()
-        self.lock_state()
-        
-        raise NotImplementedError("Not implemented")
-    
-    def ApplyAction(self, action:np.ndarray):
-        raise NotImplementedError("Not implemented")
-    
     def GetState(self):
         raise NotImplementedError("Not implemented")
     
-    def Obs(self)->Dict[str, np.ndarray]:
+    def Reset(self):
+        self.ToZeroTorque()
+        self.ToDefaultPose()
+        self.KeepDefaultPose()
+        
+        self.UpdateObs()
         raise NotImplementedError("Not implemented")
     
+    def ApplyAction(self, action:np.ndarray):
+        self.act = action.copy()
+        target_q = np.clip(action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
+        
+        self.SetPose(target_q)
+        self.UpdateObs()
     
-
+    
+    def Obs(self)->Dict[str, np.ndarray]:
+        return {'actor_obs': torch2np(self.obs_buf_dict['actor_obs']).reshape(1, -1)}
+    
     def UpdateObs(self):
         self.GetState()
         
@@ -196,8 +259,11 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.history_handler.add(key, self.hist_obs_dict[key])
             
     # TODO:
+    # self.low_cmd.motor_cmd is designed to be **Stateless**
+    # Each time you call the following CMD function,
+    # you should assume that the previous low_cmd is randomly generated
     
-    def SetMotorByPose(self, pose: np.ndarray):
+    def SetPose(self, pose: np.ndarray):
         assert pose.shape == (self.num_dofs,)
         
         for i,j in enumerate(self.dof_idx_23_to_29):
@@ -206,11 +272,17 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.low_cmd.motor_cmd[j].kp = self.kp[i]
             self.low_cmd.motor_cmd[j].kd = self.kd[i]
             self.low_cmd.motor_cmd[j].tau = 0
+        for i in self.dof_idx_locked:
+            self.low_cmd.motor_cmd[i].q = 0
+            self.low_cmd.motor_cmd[i].qd = 0
+            self.low_cmd.motor_cmd[i].tau = 0
+            self.low_cmd.motor_cmd[i].kp = self.locked_kp
+            self.low_cmd.motor_cmd[i].kd = self.locked_kd
         self.send_cmd(self.low_cmd)
         
         raise NotImplementedError("Not implemented")
     
-    def zero_torque_state(self):
+    def ToZeroTorque(self):
         # raise NotImplementedError("Not implemented")
         print("Enter zero torque state.")
         print("Waiting for the start signal...")
@@ -218,68 +290,67 @@ class RealRobot(URCIRobot, LowLevelMagic):
             create_zero_cmd(self.low_cmd)
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
-            
-    def lock_state(self):
-        for j in range(self.num_real_dofs):
-            # self.low_cmd.motor_cmd[j].mode = 1
-            self.low_cmd.motor_cmd[j].q = self.low_state.motor_state[j].q
-            self.low_cmd.motor_cmd[j].dq = 0
-            self.low_cmd.motor_cmd[j].tau = 0
-            self.low_cmd.motor_cmd[j].kp = self.locked_kp
-            self.low_cmd.motor_cmd[j].kd = self.locked_kd
-        self.send_cmd(self.low_cmd)
 
-    def move_to_default_pos(self):
-        raise NotImplementedError("Not implemented")
+    def ToDefaultPose(self):
         print("Moving to default pos.")
         # move time 2s
-        total_time = 2
+        total_time: float = 2
         num_step = int(total_time / self.dt)
         
-        dof_idx = self.config.leg_joint2motor_idx + self.config.arm_waist_joint2motor_idx
-        kps = self.config.kps + self.config.arm_waist_kps
-        kds = self.config.kds + self.config.arm_waist_kds
-        default_pos = np.concatenate((self.config.default_angles, self.config.arm_waist_target), axis=0)
-        dof_size = len(dof_idx)
         
-        # record the current pos
-        init_dof_pos = np.zeros(dof_size, dtype=np.float32)
-        for i in range(dof_size):
-            init_dof_pos[i] = self.low_state.motor_state[dof_idx[i]].q
+        start_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
+        end_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
+        kp_expanded = np.zeros(self.num_real_dofs, dtype=np.float32)
+        kd_expanded = np.zeros(self.num_real_dofs, dtype=np.float32)
+        for i in range(self.num_real_dofs):
+            start_dof_pos[i] = self.low_state.motor_state[i].q
+
+        for i,j in enumerate(self.dof_idx_23_to_29):
+            end_dof_pos[j] = self.dof_init_pose[i]
+            kp_expanded[j] = self.kp[i]
+            kd_expanded[j] = self.kd[i]
+        for i in self.dof_idx_locked:
+            end_dof_pos[i] = 0 # TODO: for now, let's assume those locked dofs are at zero pos
+            kp_expanded[i] = self.locked_kp
+            kd_expanded[i] = self.locked_kd
         
         # move to default pos
-        for i in range(num_step):
+        for i in range(num_step+1):
             alpha = i / num_step
-            for j in range(dof_size):
-                motor_idx = dof_idx[j]
-                target_pos = default_pos[j]
-                self.low_cmd.motor_cmd[motor_idx].q = init_dof_pos[j] * (1 - alpha) + target_pos * alpha
+            for j in range(self.num_real_dofs):
+                motor_idx = j
+                self.low_cmd.motor_cmd[motor_idx].q = start_dof_pos[j] * (1 - alpha) + end_dof_pos[j] * alpha
                 self.low_cmd.motor_cmd[motor_idx].qd = 0
-                self.low_cmd.motor_cmd[motor_idx].kp = kps[j]
-                self.low_cmd.motor_cmd[motor_idx].kd = kds[j]
+                self.low_cmd.motor_cmd[motor_idx].kp = kp_expanded[j]
+                self.low_cmd.motor_cmd[motor_idx].kd = kd_expanded[j]
                 self.low_cmd.motor_cmd[motor_idx].tau = 0
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
-
-    def default_pos_state(self):
-        raise NotImplementedError("Not implemented")
+            
+    def KeepDefaultPose(self):
         print("Enter default pos state.")
         print("Waiting for the Button A signal...")
+        
+        end_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
+        kp_expanded = np.zeros(self.num_real_dofs, dtype=np.float32)
+        kd_expanded = np.zeros(self.num_real_dofs, dtype=np.float32)
+
+        for i,j in enumerate(self.dof_idx_23_to_29):
+            end_dof_pos[j] = self.dof_init_pose[i]
+            kp_expanded[j] = self.kp[i]
+            kd_expanded[j] = self.kd[i]
+        for i in self.dof_idx_locked:
+            end_dof_pos[i] = 0 # TODO: for now, let's assume those locked dofs are at zero pos
+            kp_expanded[i] = self.locked_kp
+            kd_expanded[i] = self.locked_kd
+            
         while self.joystick.button[KeyMap.A] != 1:
-            for i in range(len(self.config.leg_joint2motor_idx)):
-                motor_idx = self.config.leg_joint2motor_idx[i]
-                self.low_cmd.motor_cmd[motor_idx].q = self.config.default_angles[i]
-                self.low_cmd.motor_cmd[motor_idx].qd = 0
-                self.low_cmd.motor_cmd[motor_idx].kp = self.config.kps[i]
-                self.low_cmd.motor_cmd[motor_idx].kd = self.config.kds[i]
-                self.low_cmd.motor_cmd[motor_idx].tau = 0
-            for i in range(len(self.config.arm_waist_joint2motor_idx)):
-                motor_idx = self.config.arm_waist_joint2motor_idx[i]
-                self.low_cmd.motor_cmd[motor_idx].q = self.config.arm_waist_target[i]
-                self.low_cmd.motor_cmd[motor_idx].qd = 0
-                self.low_cmd.motor_cmd[motor_idx].kp = self.config.arm_waist_kps[i]
-                self.low_cmd.motor_cmd[motor_idx].kd = self.config.arm_waist_kds[i]
-                self.low_cmd.motor_cmd[motor_idx].tau = 0
+            for i in range(self.num_real_dofs):
+                self.low_cmd.motor_cmd[i].q = end_dof_pos[i]
+                self.low_cmd.motor_cmd[i].qd = 0
+                self.low_cmd.motor_cmd[i].kp = kp_expanded[i]
+                self.low_cmd.motor_cmd[i].kd = kd_expanded[i]
+                self.low_cmd.motor_cmd[i].tau = 0
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
 
