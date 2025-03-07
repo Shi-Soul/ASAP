@@ -10,6 +10,12 @@ simulator:
       fps: 50
       control_decimation: 1
 deploy:
+  BYPASS_ACT: False
+
+  render: True
+  defcmd: [0.0, 0.0, 0.0, 0.0]
+  heading_cmd: True
+
   ctrl_dt: 0.02
   net: ???
   msg_type: "hg"     # "hg" or "go"

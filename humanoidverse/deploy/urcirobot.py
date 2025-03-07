@@ -7,6 +7,9 @@ from humanoidverse.utils.motion_lib.motion_lib_robot import MotionLibRobot
 import time
 
 class URCIRobot:
+    REAL: bool
+    BYPASS_ACT: bool
+    
     dt: float # big dt, not small dt
     cfg: OmegaConf
     
@@ -22,7 +25,7 @@ class URCIRobot:
     act: np.ndarray
     
     def __init__(self, cfg: OmegaConf):
-        raise NotImplementedError("Not implemented")
+        self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
     
     def looping(self, policy_fn):
         self._check_init()
@@ -59,6 +62,8 @@ class URCIRobot:
         
         assert self.tau_limit is not None and type(self.tau_limit) == np.ndarray and self.tau_limit.shape == (self.num_dofs,), "tau_limit is not set"
         
+        assert self.BYPASS_ACT is not None, "BYPASS_ACT is not set"
+        assert self.BYPASS_ACT in [True, False], "BYPASS_ACT is not a boolean, got {self.BYPASS_ACT}"
     
     def _make_init_pose(self):
         cfg_init_state = self.cfg.robot.init_state

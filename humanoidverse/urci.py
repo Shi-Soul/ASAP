@@ -2,13 +2,6 @@
 # Weiji Xie @ 2025.03.04
 
 REAL       :bool    = False
-BYPASS_ACT :bool    = False
-HEADING_CMD:bool    = True
-
-LOG        :bool    = True
-RENDER     :bool    = True
-PLOT       :bool    = False
-defcmd = [0.0, 0.0, 0.0, 0.0]
 
 
 if not REAL:
@@ -75,6 +68,8 @@ def quaternion_to_euler_array(quat):
 
 
 class MujocoRobot(URCIRobot):
+    REAL=False
+    
     ACT_EMA: bool = False # Noise
     RAND_NOISE: bool = False
     RAND_DELAY: bool = False
@@ -90,6 +85,7 @@ class MujocoRobot(URCIRobot):
     print_torque = lambda tau: print(f"tau (norm, max) = {np.linalg.norm(tau):.2f}, \t{np.max(tau):.2f}", end='\r')
     
     def __init__(self, cfg):
+        super().__init__(cfg)
         self.cfg:OmegaConf = cfg
         self.device="cpu"
         
@@ -109,7 +105,8 @@ class MujocoRobot(URCIRobot):
         self.data = mujoco.MjData(self.model) # type: ignore
         self.model.opt.timestep = self.sim_dt
         
-        self.cmd = np.array(defcmd)
+        self.heading_cmd = cfg.deploy.heading_cmd   
+        self.cmd = np.array(cfg.deploy.defcmd)
         self.num_actions = cfg.robot.actions_dim
         self.num_ctrl = self.data.ctrl.shape[0]
         assert self.num_ctrl == self.num_actions, f"Number of control DOFs {self.num_ctrl} does not match number of actions {self.num_actions}"
@@ -129,7 +126,8 @@ class MujocoRobot(URCIRobot):
         self.Reset()
         
         mujoco.mj_step(self.model, self.data) # type: ignore    
-        if RENDER:
+        if cfg.deploy.render:
+            self.is_render = True
             self.__make_viewer()
 
     def __make_viewer(self):
@@ -156,17 +154,17 @@ class MujocoRobot(URCIRobot):
                 elif key == glfw.KEY_PERIOD:
                     self.cmd[0] -= 0.1
                 elif key == glfw.KEY_K:
-                    if HEADING_CMD:
+                    if self.heading_cmd:
                         self.cmd[3] = wrap_to_pi_float(self.cmd[3]+np.pi/20)
                     else:
                         self.cmd[2] += 0.1
                 elif key == glfw.KEY_SEMICOLON:
-                    if HEADING_CMD:                            
+                    if self.heading_cmd:                            
                         self.cmd[3] = wrap_to_pi_float(self.cmd[3]-np.pi/20)
                     else:
                         self.cmd[2] -= 0.1
                 elif key == glfw.KEY_APOSTROPHE:
-                    self.cmd = np.array(defcmd)
+                    self.cmd = np.array(self.cfg.deploy.defcmd)
                 elif key == glfw.KEY_ENTER:
                     self.Reset()
                 print(self.cmd)
@@ -216,7 +214,7 @@ class MujocoRobot(URCIRobot):
         self.gvec = r.apply(np.array([0., 0., -1.]), inverse=True).astype(np.double)
     
         
-        if HEADING_CMD:
+        if self.heading_cmd:
             self.cmd[2] = np.clip(0.5*wrap_to_pi_float(self.cmd[3] - self.rpy[2]), -1., 1.)
             
         if self.is_motion_tracking:
@@ -261,7 +259,7 @@ class MujocoRobot(URCIRobot):
                         print(f"Warning!!! Collision between '{geom1_name,contact.geom1}' and '{geom2_name,contact.geom2}' at position {contact.pos}.")
                     
                 # breakpoint()
-            if RENDER:
+            if self.is_render:
                 if self.viewer.is_alive:
                     self.viewer.render()
                 else:
@@ -559,6 +557,7 @@ def main(override_config: OmegaConf):
     policy_fn = load_policy(config, checkpoint)
     
     robot:URCIRobot = RobotCls(config)
+    assert robot.REAL==REAL, f" {robot.REAL=} is not equal to {REAL=}!!! Please manually set the REAL flag in the header."
     
     robot.looping(policy_fn)
     

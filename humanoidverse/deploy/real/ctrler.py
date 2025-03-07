@@ -185,7 +185,10 @@ class LowLevelMagic:
 
 
 class RealRobot(URCIRobot, LowLevelMagic):
+    REAL=True
+    
     def __init__(self, cfg: OmegaConf):
+        super().__init__(cfg)
         
         self.cfg: OmegaConf = cfg
         self.device: str = "cpu"
@@ -193,7 +196,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.timer: int = 0
         
         self.num_real_dofs: int = len(self.low_cmd.motor_cmd)
-        self.cmd: np.ndarray = np.array([0, 0, 0, 0])
+        self.cmd: np.ndarray = np.array(cfg.deploy.defcmd)
         assert self.num_real_dofs == 29, "Only 29 dofs are supported for now"
         
         self.clip_action_limit: float = cfg.robot.control.action_clip_value
