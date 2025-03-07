@@ -462,30 +462,28 @@ def main(override_config: OmegaConf):
         return RobotCls, pre_process_config, torch
         
     def get_config(override_config: OmegaConf):
-    
+        
+        single_policy_config = OmegaConf.load("humanoidverse/config/deploy/single.yaml")
+        
         if override_config.checkpoint is not None:
-            has_config = True
             checkpoint = Path(override_config.checkpoint)
             config_path = checkpoint.parent / "config.yaml"
             if not config_path.exists():
                 config_path = checkpoint.parent.parent / "config.yaml"
                 if not config_path.exists():
-                    has_config = False
                     logger.error(f"Could not find config path: {config_path}")
+                    raise NotImplementedError("Not implemented")
 
-            if has_config:
-                logger.info(f"Loading training config file from {config_path}")
-                with open(config_path) as file:
-                    train_config = OmegaConf.load(file)
+            logger.info(f"Loading training config file from {config_path}")
+            with open(config_path) as file:
+                train_config = OmegaConf.load(file)
 
-                if train_config.eval_overrides is not None:
-                    train_config = OmegaConf.merge(
-                        train_config, train_config.eval_overrides
-                    )
+            if train_config.eval_overrides is not None:
+                train_config = OmegaConf.merge(
+                    train_config, train_config.eval_overrides
+                )
 
-                config = OmegaConf.merge(train_config, override_config)
-            else:
-                config = override_config
+            config = OmegaConf.merge(train_config, override_config)
         else:
             raise NotImplementedError("Not implemented")
             if override_config.eval_overrides is not None:
@@ -506,6 +504,7 @@ def main(override_config: OmegaConf):
         config.env.config.ckpt_dir = str(checkpoint.parent) # commented out for now, might need it back to save motion
         OmegaConf.set_struct(config, False)
         
+        config = OmegaConf.merge(single_policy_config, config)
         return config, checkpoint
     
     def setup_logging2(config: OmegaConf):

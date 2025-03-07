@@ -21,9 +21,3 @@ simulator:
     scene:
       num_envs: ${num_envs}
       env_spacing: ${env.config.env_spacing}
-deploy:
-  BYPASS_ACT: False
-
-  render: True
-  defcmd: [0.0, 0.0, 0.0, 0.0]
-  heading_cmd: True
