@@ -185,7 +185,7 @@ class MujocoRobot(URCIRobot):
 
         self.subtimer = 0
         
-        self.GetState()
+        self.UpdateObs()
         ...
 
     @staticmethod
@@ -267,6 +267,8 @@ class MujocoRobot(URCIRobot):
                 else:
                     raise Exception("Mujoco Robot Exit")
             self.subtimer += 1
+        
+        self.UpdateObs()
 
 
     def UpdateObs(self):
@@ -310,7 +312,6 @@ class MujocoRobot(URCIRobot):
     @property
     def Obs(self):
         
-        self.UpdateObs()
         # return {k: torch2np(v) for k, v in self.obs_buf_dict.items()}
         return {'actor_obs': torch2np(self.obs_buf_dict['actor_obs']).reshape(1, -1)}
 
