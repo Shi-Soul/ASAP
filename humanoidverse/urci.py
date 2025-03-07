@@ -459,7 +459,7 @@ def main(override_config: OmegaConf):
         import torch
         from humanoidverse.utils.inference_helpers import export_policy_as_jit, export_policy_as_onnx, export_policy_and_estimator_as_onnx
 
-        return RobotCls, BaseAlgo, pre_process_config, torch, export_policy_as_jit, export_policy_as_onnx, export_policy_and_estimator_as_onnx
+        return RobotCls, pre_process_config, torch
         
     def get_config(override_config: OmegaConf):
     
@@ -547,9 +547,7 @@ def main(override_config: OmegaConf):
     
     setup_logging2(config)
     
-    RobotCls, BaseAlgo, pre_process_config, torch, \
-        export_policy_as_jit, export_policy_as_onnx, export_policy_and_estimator_as_onnx = \
-                                setup_simulator(config)
+    RobotCls, pre_process_config, torch= setup_simulator(config)
     
     pre_process_config(config)
     # device = config.get("device", "cuda:0" if torch.cuda.is_available() else "cpu")

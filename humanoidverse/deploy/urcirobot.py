@@ -27,6 +27,7 @@ class URCIRobot:
     def __init__(self, cfg: OmegaConf):
         self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
     
+    
     def looping(self, policy_fn):
         self._check_init()
         while True:
