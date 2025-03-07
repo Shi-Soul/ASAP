@@ -7,6 +7,17 @@ from humanoidverse.utils.motion_lib.motion_lib_robot import MotionLibRobot
 
 
 class URCIRobot:
+    q: np.ndarray
+    dq: np.ndarray
+    # pos: np.ndarray
+    # vel: np.ndarray
+    quat: np.ndarray
+    omega: np.ndarray
+    gvec: np.ndarray
+    rpy: np.ndarray
+    
+    act: np.ndarray
+    
     def __init__(self, cfg: OmegaConf):
         raise NotImplementedError("Not implemented")
     
@@ -56,7 +67,17 @@ class URCIRobot:
         
         
     def _make_buffer(self):
-        self.act = np.zeros(self.num_actions)
+        
+        self.q = np.zeros(self.num_dofs)
+        self.dq = np.zeros(self.num_dofs)
+        self.quat = np.zeros(4)
+        self.omega = np.zeros(3)
+        self.gvec = np.zeros(3)
+        self.rpy = np.zeros(3)
+        
+        self.act = np.zeros(self.num_dofs)
+        
+        
         self.history_handler = HistoryHandler(1, self.cfg.obs.obs_auxiliary, self.cfg.obs.obs_dims, self.device)
         ...
         

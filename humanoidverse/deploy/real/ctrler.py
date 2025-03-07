@@ -200,7 +200,32 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.Reset()
         raise NotImplementedError("Not implemented")
     
+    def _make_buffer(self):
+        super()._make_buffer()
+        
+        self.q_real = np.zeros(self.num_real_dofs)
+        self.dq_real = np.zeros(self.num_real_dofs)
+        self.ddq_real = np.zeros(self.num_real_dofs)
+        self.tau_est = np.zeros(self.num_real_dofs)
+
+        self.kp_real = np.zeros(self.num_real_dofs)
+        self.kd_real = np.zeros(self.num_real_dofs)
+    
     def GetState(self):
+        # q,dq
+        # self.tau_est = np.zeros(self.num_real_dofs)
+        for i,j in enumerate(self.dof_idx_23_to_29):
+            self.q[i] = self.low_state.motor_state[j].q
+            self.dq[i] = self.low_state.motor_state[j].dq
+        
+        # quat, omega
+        quat = self.low_state.imu_state.quaternion
+        ang_vel = np.array([self.low_state.imu_state.gyroscope], dtype=np.float32)
+        gravity_orientation = get_gravity_orientation(quat)
+        
+        # rpy = quaternion_to_euler_array(self.quat)
+        # self.rpy[self.rpy > math.pi] -= 2 * math.pi
+        
         raise NotImplementedError("Not implemented")
     
     def Reset(self):
@@ -208,8 +233,11 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.ToDefaultPose()
         self.KeepDefaultPose()
         
+        self.act[:] = 0
+        self.history_handler.reset([0])
+        self.timer: int = 0
+        
         self.UpdateObs()
-        raise NotImplementedError("Not implemented")
     
     def ApplyAction(self, action:np.ndarray):
         self.act = action.copy()
@@ -217,7 +245,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
         
         self.SetPose(target_q)
         self.UpdateObs()
-    
     
     def Obs(self)->Dict[str, np.ndarray]:
         return {'actor_obs': torch2np(self.obs_buf_dict['actor_obs']).reshape(1, -1)}
@@ -389,45 +416,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.cmd[0] = self.joystick.ly
         self.cmd[1] = self.joystick.lx * -1
         self.cmd[2] = self.joystick.rx * -1
-
-        num_actions = self.config.num_actions
-        self.obs[:3] = ang_vel
-        self.obs[3:6] = gravity_orientation
-        self.obs[6:9] = self.cmd * self.config.cmd_scale * self.config.max_cmd
-        self.obs[9 : 9 + num_actions] = qj_obs
-        self.obs[9 + num_actions : 9 + num_actions * 2] = dqj_obs
-        self.obs[9 + num_actions * 2 : 9 + num_actions * 3] = self.action
-        self.obs[9 + num_actions * 3] = sin_phase
-        self.obs[9 + num_actions * 3 + 1] = cos_phase
-
-        # Get the action from the policy network
-        obs_tensor = torch.from_numpy(self.obs).unsqueeze(0)
-        self.action = self.policy(obs_tensor).detach().numpy().squeeze()
-        
-        # transform action to target_dof_pos
-        target_dof_pos = self.config.default_angles + self.action * self.config.action_scale
-
-        # Build low cmd
-        for i in range(len(self.config.leg_joint2motor_idx)):
-            motor_idx = self.config.leg_joint2motor_idx[i]
-            self.low_cmd.motor_cmd[motor_idx].q = target_dof_pos[i]
-            self.low_cmd.motor_cmd[motor_idx].qd = 0
-            self.low_cmd.motor_cmd[motor_idx].kp = self.config.kps[i]
-            self.low_cmd.motor_cmd[motor_idx].kd = self.config.kds[i]
-            self.low_cmd.motor_cmd[motor_idx].tau = 0
-
-        for i in range(len(self.config.arm_waist_joint2motor_idx)):
-            motor_idx = self.config.arm_waist_joint2motor_idx[i]
-            self.low_cmd.motor_cmd[motor_idx].q = self.config.arm_waist_target[i]
-            self.low_cmd.motor_cmd[motor_idx].qd = 0
-            self.low_cmd.motor_cmd[motor_idx].kp = self.config.arm_waist_kps[i]
-            self.low_cmd.motor_cmd[motor_idx].kd = self.config.arm_waist_kds[i]
-            self.low_cmd.motor_cmd[motor_idx].tau = 0
-
-        # send the command
-        self.send_cmd(self.low_cmd)
-
-        time.sleep(self.dt)
 
 
 
