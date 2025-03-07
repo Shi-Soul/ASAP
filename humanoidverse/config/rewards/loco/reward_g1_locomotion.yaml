@@ -36,6 +36,8 @@ rewards:
       penalty_ang_vel_xy_torso: -1.0
       penalty_hip_pos: -1.0
 
+      # custom reward
+      collision: -100
 
   reward_tracking_sigma:
     lin_vel: 0.25
@@ -108,5 +110,6 @@ rewards:
     "upperbody_joint_angle_freeze",
     "penalty_close_feet_xy",
     "penalty_ang_vel_xy_torso",
-    "penalty_hip_pos"]
+    "penalty_hip_pos",
+    "collision"]
 

@@ -774,6 +774,12 @@ class LeggedRobotBase(BaseTask):
         right_gravity = quat_rotate_inverse(right_quat, self.gravity_vec)
         return torch.sum(torch.square(left_gravity[:, :2]), dim=1)**0.5 + torch.sum(torch.square(right_gravity[:, :2]), dim=1)**0.5 
     
+    
+    ### custom rewards
+    def _reward_collision(self):
+        # Penalize collisions on selected bodies
+        return torch.sum(1.*(torch.norm(self.simulator.contact_forces[:, self.penalised_contact_indices, :], dim=-1) > 0.1), dim=1)
+    
     def _episodic_domain_randomization(self, env_ids):
         """ Update scale of Kp, Kd, rfi lim"""
         if len(env_ids) == 0:
