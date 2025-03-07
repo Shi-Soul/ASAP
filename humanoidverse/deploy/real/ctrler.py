@@ -63,7 +63,7 @@ class LowLevelMagic:
             self.lowcmd_publisher_.Init()
 
             self.lowstate_subscriber = ChannelSubscriber(config.lowstate_topic, LowStateHG)
-            self.lowstate_subscriber.Init(self.LowStateHgHandler, 10)
+            self.lowstate_subscriber.Init(self.receive_state_handler, 10)
 
         elif config.msg_type == "go":
             raise ValueError("Not implemented for go msg type. This code is designed for hg msg type.")
@@ -89,18 +89,6 @@ class LowLevelMagic:
         elif config.msg_type == "go":
             init_cmd_go(self.low_cmd, weak_motor=config.weak_motor)
             
-    
-    def LowStateHgHandler(self, msg: LowStateHG):
-        self.low_state = msg
-        self.mode_machine_ = self.low_state.mode_machine
-        self.joystick.set(self.low_state.wireless_remote)
-        
-    def _wait(self):
-        while self.low_state.tick == 0:
-            time.sleep(0.01)
-            logger.info("Waiting for the robot to connect...")
-        logger.info("Successfully connected to the robot.")
-        
     def safe_exit(self):
         logger.info("Exiting...")
         os._exit(1)
@@ -116,14 +104,29 @@ class LowLevelMagic:
                              f"q\t\t: {self.low_state.motor_state[motor_idx].q} "
                              f"dq\t\t: {self.low_state.motor_state[motor_idx].dq}")
                 self.safe_exit()
-            else:
-                pass
         
     def send_cmd(self):
         self.sanity_check()
         self.low_cmd.crc = CRC().Crc(self.low_cmd)
         self.lowcmd_publisher_.Write(self.low_cmd)
 
+    def LowStateCallback(self):
+        pass
+    
+    def receive_state_handler(self, msg: LowStateHG):
+        self.low_state = msg
+        self.mode_machine_ = self.low_state.mode_machine
+        self.joystick.set(self.low_state.wireless_remote)
+        
+        self.sanity_check()
+        self.LowStateCallback()
+        
+    def _wait(self):
+        while self.low_state.tick == 0:
+            time.sleep(0.01)
+            logger.info("Waiting for the robot to connect...")
+        logger.info("Successfully connected to the robot.")
+        
 
     # @dataclass
     # @annotate.final
@@ -320,6 +323,17 @@ class RealRobot(URCIRobot, LowLevelMagic):
 
         for key in self.history_handler.history.keys():
             self.history_handler.add(key, self.hist_obs_dict[key])
+            
+            
+    
+    def LowStateCallback(self):
+        
+        # handle joystick keyboard
+        
+        if self.joystick.button[KeyMap.B] == 1: # quick stop
+            self.safe_exit()
+            
+        pass
             
     # self.low_cmd.motor_cmd is designed to be **Stateless**
     # Each time you call the following CMD function,
