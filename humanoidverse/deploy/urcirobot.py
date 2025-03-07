@@ -30,9 +30,25 @@ class URCIRobot:
     
     def looping(self, policy_fn):
         self._check_init()
+        
         while True:
+            t1 = time.time()
+            
             action = policy_fn(self.Obs())[0]
+            
+            if self.BYPASS_ACT: action = np.zeros_like(action)
+            
             self.ApplyAction(action)
+            
+            t2 = time.time()
+            
+            if self.REAL:
+                remain_dt = self.dt - (t2-t1)
+                if remain_dt > 0:
+                    time.sleep(remain_dt)
+                else:
+                    logger.warning(f"Warning! delay = {t2-t1} longer than policy_dt = {self.dt} , skip sleeping")
+            # print(f"time: {t2-t1}")
             # time.sleep(self.dt)
         ...
     
