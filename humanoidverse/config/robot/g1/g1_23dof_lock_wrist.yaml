@@ -178,7 +178,7 @@ robot:
     xml_file: "g1/${robot.asset.robot_type}.xml"
     # xml_file: "g1/${robot.asset.robot_type}_fitmotionONLY.xml"
     robot_type: g1_23dof_lock_wrist
-    self_collisions: 1 # 1 to disable, 0 to enable self collisions
+    self_collisions: 0 # 1 to disable, 0 to enable self collisions
     default_dof_drive_mode: 3
 
     fix_base_link: False # TEST: fix base link to world

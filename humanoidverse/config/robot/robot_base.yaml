@@ -61,7 +61,7 @@ robot:
     usd_file: null
     xml_file: null
     asset_root: "humanoidverse/data/robots"
-    self_collisions: True
+    self_collisions: 0
     filter_ints: null
 
 # motion_lib:
