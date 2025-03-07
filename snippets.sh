@@ -11,30 +11,14 @@ python humanoidverse/train_agent.py \
 +robot=g1/g1_23dof_lock_wrist \
 +terrain=terrain_locomotion_plane \
 +obs=loco/leggedloco_obs_history_wjx \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist_custom_collision.urdf" \
 num_envs=4096 \
 project_name=G1Loco \
-experiment_name=v0 \
+experiment_name=v0Coll \
 headless=True \
 rewards.reward_penalty_curriculum=True \
 rewards.reward_initial_penalty_scale=0.1 \
 rewards.reward_penalty_degree=0.00003 
-
-HYDRA_FULL_ERROR=1 python humanoidverse/train_agent.py \
-+simulator=isaacgym \
-+exp=locomotion \
-+domain_rand=NO_domain_rand \
-+rewards=loco/reward_g1_locomotion \
-+robot=g1/g1_23dof_lock_wrist \
-+terrain=terrain_locomotion_plane \
-+obs=loco/leggedloco_obs_history_wjx \
-num_envs=4096 \
-project_name=G1LocoO \
-experiment_name=v0NoDR \
-headless=True \
-rewards.reward_penalty_curriculum=True \
-rewards.reward_initial_penalty_scale=0.1 \
-rewards.reward_penalty_degree=0.00003 
-
 
 
 

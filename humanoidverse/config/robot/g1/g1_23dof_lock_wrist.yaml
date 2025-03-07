@@ -189,7 +189,6 @@ robot:
     asset:
       assetRoot: "humanoidverse/data/robots/g1/"
       assetFileName: "g1_23dof_lock_wrist_fitmotionONLY.xml"
-      urdfFileName: "g1_23dof_lock_wrist.urdf"
 
     humanoid_type: g1_23dof_lock_wrist
     bias_offset: False
