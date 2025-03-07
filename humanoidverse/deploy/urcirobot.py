@@ -41,9 +41,6 @@ class URCIRobot:
     def ApplyAction(self, action:np.ndarray):
         raise NotImplementedError("Not implemented")
     
-    def GetState(self):
-        raise NotImplementedError("Not implemented")
-    
     def Obs(self)->Dict[str, np.ndarray]:
         raise NotImplementedError("Not implemented")
     

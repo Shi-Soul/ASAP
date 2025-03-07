@@ -266,7 +266,15 @@ class RealRobot(URCIRobot, LowLevelMagic):
         
         self.cmd[0] = self.joystick.ly
         self.cmd[1] = self.joystick.lx * -1
-        self.cmd[2] = self.joystick.rx * -1
+        self.cmd[3] += self.joystick.ry * -1 * self.dt * 0.1
+        
+        if self.heading_cmd:
+            self.cmd[2] = np.clip(0.5*wrap_to_pi_float(self.cmd[3] - self.rpy[2]), -1., 1.)
+        else:
+            self.cmd[2] = self.joystick.rx * -1
+        breakpoint() # check the syntax of self.cmd
+        
+        
         breakpoint() # check the valid value 
         # TODO: add real-time logging for the state
     
