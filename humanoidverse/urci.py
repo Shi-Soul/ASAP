@@ -309,7 +309,6 @@ class MujocoRobot(URCIRobot):
             
         # breakpoint()
 
-    @property
     def Obs(self):
         
         # return {k: torch2np(v) for k, v in self.obs_buf_dict.items()}
@@ -561,12 +560,7 @@ def main(override_config: OmegaConf):
     
     robot:URCIRobot = RobotCls(config)
     
-    # breakpoint()
-    while True:
-        action = policy_fn(robot.Obs)[0]
-        # action = np.zeros(robot.num_actions)
-        
-        robot.ApplyAction(action)
+    robot.looping(policy_fn)
     
     
 if __name__ == "__main__":

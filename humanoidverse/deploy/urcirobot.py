@@ -4,9 +4,12 @@ from omegaconf import OmegaConf
 from loguru import logger
 from humanoidverse.envs.env_utils.history_handler import HistoryHandler
 from humanoidverse.utils.motion_lib.motion_lib_robot import MotionLibRobot
-
+import time
 
 class URCIRobot:
+    dt: float # big dt, not small dt
+    cfg: OmegaConf
+    
     q: np.ndarray
     dq: np.ndarray
     # pos: np.ndarray
@@ -21,6 +24,14 @@ class URCIRobot:
     def __init__(self, cfg: OmegaConf):
         raise NotImplementedError("Not implemented")
     
+    def looping(self, policy_fn):
+        self._check_init()
+        while True:
+            action = policy_fn(self.Obs())[0]
+            self.ApplyAction(action)
+            # time.sleep(self.dt)
+        ...
+    
     def Reset(self):
         raise NotImplementedError("Not implemented")
     
@@ -32,6 +43,22 @@ class URCIRobot:
     
     def Obs(self)->Dict[str, np.ndarray]:
         raise NotImplementedError("Not implemented")
+    
+    def _check_init(self):
+        assert self.dt is not None, "dt is not set"
+        assert self.dt>0 and self.dt < 0.1, "dt is not in the valid range"
+        assert self.cfg is not None or not isinstance(self.cfg, OmegaConf), "cfg is not set"
+        
+        assert self.num_dofs is not None, "num_dofs is not set"
+        assert self.num_dofs == 23, "In policy level, only 23 dofs are supported for now"
+        assert self.kp is not None and type(self.kp) == np.ndarray and self.kp.shape == (self.num_dofs,), "kp is not set"
+        assert self.kd is not None and type(self.kd) == np.ndarray and self.kd.shape == (self.num_dofs,), "kd is not set"
+        
+        assert (self.dof_init_pose is not None and type(self.dof_init_pose) == np.ndarray and 
+                    self.dof_init_pose.shape == (self.num_dofs,)), "dof_init_pose is not set"
+        
+        assert self.tau_limit is not None and type(self.tau_limit) == np.ndarray and self.tau_limit.shape == (self.num_dofs,), "tau_limit is not set"
+        
     
     def _make_init_pose(self):
         cfg_init_state = self.cfg.robot.init_state
