@@ -21,12 +21,12 @@ from unitree_sdk2py.idl.unitree_go.msg.dds_ import LowState_ as LowStateGo # typ
 from unitree_sdk2py.utils.crc import CRC # type: ignore
 
 from humanoidverse.utils.real.command_helper import create_damping_cmd, create_zero_cmd, init_cmd_hg, init_cmd_go, MotorMode
-from humanoidverse.utils.real.rotation_helper import get_gravity_orientation, transform_imu_data
+from humanoidverse.utils.real.rotation_helper import get_gravity_orientation, transform_imu_data, quaternion_to_euler_array
 from humanoidverse.utils.real.remote_controller import RemoteController, KeyMap
 from humanoidverse.envs.env_utils.history_handler import HistoryHandler
 from humanoidverse.utils.motion_lib.motion_lib_robot import MotionLibRobot
 from humanoidverse.utils.helpers import parse_observation
-
+import math
 from typing import Dict
 import numpy as np
 from omegaconf import OmegaConf
@@ -66,7 +66,7 @@ class LowLevelMagic:
             self.lowstate_subscriber.Init(self.LowStateHgHandler, 10)
 
         elif config.msg_type == "go":
-            raise NotImplementedError("Not implemented")
+            raise ValueError("Not implemented for go msg type. This code is designed for hg msg type.")
             # h1 uses the go msg type
             self.low_cmd = unitree_go_msg_dds__LowCmd_()
             self.low_state = unitree_go_msg_dds__LowState_()
@@ -101,8 +101,11 @@ class LowLevelMagic:
             print("Waiting for the robot to connect...")
         print("Successfully connected to the robot.")
         
-    def send_cmd(self, cmd: Union[LowCmdGo, LowCmdHG]):
+    def sanity_check(self, cmd: Union[LowCmdGo, LowCmdHG]):
         raise NotImplementedError("TODO: add sanity check")
+        
+    def send_cmd(self, cmd: Union[LowCmdGo, LowCmdHG]):
+        self.sanity_check(cmd)
         cmd.crc = CRC().Crc(cmd)
         self.lowcmd_publisher_.Write(cmd)
 
@@ -198,7 +201,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
         super().__init__(cfg)
         
         self.Reset()
-        raise NotImplementedError("Not implemented")
     
     def _make_buffer(self):
         super()._make_buffer()
@@ -222,21 +224,30 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.kd_real[j] = self.locked_kd
     
     def GetState(self):
-        # q,dq
-        # self.tau_est = np.zeros(self.num_real_dofs)
-        for i,j in enumerate(self.dof_idx_23_to_29):
-            self.q[i] = self.low_state.motor_state[j].q
-            self.dq[i] = self.low_state.motor_state[j].dq
+        for j in range(self.num_real_dofs):
+            self.q_real[j] = self.low_state.motor_state[j].q
+            self.dq_real[j] = self.low_state.motor_state[j].dq
+            self.ddq_real[j] = self.low_state.motor_state[j].ddq
+            self.tau_est[j] = self.low_state.motor_state[j].tau_est
+            
+        self.q = self.q_real[self.dof_idx_23_to_29]
+        self.dq = self.dq_real[self.dof_idx_23_to_29] 
+        breakpoint() # check the grammar
         
         # quat, omega
-        quat = self.low_state.imu_state.quaternion
-        ang_vel = np.array([self.low_state.imu_state.gyroscope], dtype=np.float32)
-        gravity_orientation = get_gravity_orientation(quat)
+        self.quat = self.low_state.imu_state.quaternion
+        self.omega = np.array([self.low_state.imu_state.gyroscope], dtype=np.float32)
+        self.gvec = get_gravity_orientation(self.quat)
         
-        # rpy = quaternion_to_euler_array(self.quat)
-        # self.rpy[self.rpy > math.pi] -= 2 * math.pi
+        self.rpy = quaternion_to_euler_array(self.quat)
+        self.rpy[self.rpy > math.pi] -= 2 * math.pi
         
-        raise NotImplementedError("Not implemented")
+        
+        self.cmd[0] = self.joystick.ly
+        self.cmd[1] = self.joystick.lx * -1
+        self.cmd[2] = self.joystick.rx * -1
+        breakpoint() # check the valid value 
+        # TODO: add real-time logging for the state
     
     def Reset(self):
         self.ToZeroTorque()
@@ -295,7 +306,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
         for key in self.history_handler.history.keys():
             self.history_handler.add(key, self.hist_obs_dict[key])
             
-    # TODO:
     # self.low_cmd.motor_cmd is designed to be **Stateless**
     # Each time you call the following CMD function,
     # you should assume that the previous low_cmd is randomly generated
@@ -320,7 +330,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.send_cmd(self.low_cmd)
     
     def ToZeroTorque(self):
-        # raise NotImplementedError("Not implemented")
         print("Enter zero torque state.")
         print("Waiting for the start signal...")
         while self.joystick.button[KeyMap.start] != 1:
@@ -350,6 +359,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
                 self.low_cmd.motor_cmd[j].tau = 0
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
+            
     def KeepDefaultPose(self):
         print("Enter default pos state.")
         print("Waiting for the Button A signal...")
@@ -371,41 +381,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
 
-    def run(self):
-        raise NotImplementedError("Not implemented")
-        self.counter += 1
-        # Get the current joint position and velocity
-        for i in range(len(self.config.leg_joint2motor_idx)):
-            self.qj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].q
-            self.dqj[i] = self.low_state.motor_state[self.config.leg_joint2motor_idx[i]].dq
-
-        # imu_state quaternion: w, x, y, z
-        quat = self.low_state.imu_state.quaternion
-        ang_vel = np.array([self.low_state.imu_state.gyroscope], dtype=np.float32)
-
-        if self.config.imu_type == "torso":
-            # h1 and h1_2 imu is on the torso
-            # imu data needs to be transformed to the pelvis frame
-            waist_yaw = self.low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].q
-            waist_yaw_omega = self.low_state.motor_state[self.config.arm_waist_joint2motor_idx[0]].dq
-            quat, ang_vel = transform_imu_data(waist_yaw=waist_yaw, waist_yaw_omega=waist_yaw_omega, imu_quat=quat, imu_omega=ang_vel)
-
-        # create observation
-        gravity_orientation = get_gravity_orientation(quat)
-        qj_obs = self.qj.copy()
-        dqj_obs = self.dqj.copy()
-        qj_obs = (qj_obs - self.config.default_angles) * self.config.dof_pos_scale
-        dqj_obs = dqj_obs * self.config.dof_vel_scale
-        ang_vel = ang_vel * self.config.ang_vel_scale
-        period = 0.8
-        count = self.counter * self.config.control_dt
-        phase = count % period / period
-        sin_phase = np.sin(2 * np.pi * phase)
-        cos_phase = np.cos(2 * np.pi * phase)
-
-        self.cmd[0] = self.joystick.ly
-        self.cmd[1] = self.joystick.lx * -1
-        self.cmd[2] = self.joystick.rx * -1
 
 
 
