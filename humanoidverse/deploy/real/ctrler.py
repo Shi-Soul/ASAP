@@ -31,7 +31,7 @@ from typing import Dict
 import numpy as np
 from omegaconf import OmegaConf
 from loguru import logger
-
+import os
 
 from ..urcirobot import URCIRobot
 np2torch = lambda x: torch.tensor(x, dtype=torch.float32)
@@ -98,16 +98,31 @@ class LowLevelMagic:
     def _wait(self):
         while self.low_state.tick == 0:
             time.sleep(0.01)
-            print("Waiting for the robot to connect...")
-        print("Successfully connected to the robot.")
+            logger.info("Waiting for the robot to connect...")
+        logger.info("Successfully connected to the robot.")
         
-    def sanity_check(self, cmd: Union[LowCmdGo, LowCmdHG]):
-        raise NotImplementedError("TODO: add sanity check")
+    def safe_exit(self):
+        logger.info("Exiting...")
+        os._exit(1)
         
-    def send_cmd(self, cmd: Union[LowCmdGo, LowCmdHG]):
-        self.sanity_check(cmd)
-        cmd.crc = CRC().Crc(cmd)
-        self.lowcmd_publisher_.Write(cmd)
+    def sanity_check(self):
+        for motor_idx in range(len(self.low_cmd.motor_cmd)):
+            if ((np.abs(self.low_cmd.motor_cmd[motor_idx].q - self.low_state.motor_state[motor_idx].q) > 1.5 ) or 
+                (np.abs(self.low_cmd.motor_cmd[motor_idx].dq) > 20)):
+
+                logger.error(f"Action of joint {motor_idx} is too large."
+                             f"target q\t: {self.low_cmd.motor_cmd[motor_idx].q} "
+                             f"target dq\t: {self.low_cmd.motor_cmd[motor_idx].dq} "
+                             f"q\t\t: {self.low_state.motor_state[motor_idx].q} "
+                             f"dq\t\t: {self.low_state.motor_state[motor_idx].dq}")
+                self.safe_exit()
+            else:
+                pass
+        
+    def send_cmd(self):
+        self.sanity_check()
+        self.low_cmd.crc = CRC().Crc(self.low_cmd)
+        self.lowcmd_publisher_.Write(self.low_cmd)
 
 
     # @dataclass
@@ -327,18 +342,18 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 使用预计算值
             self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 使用预计算值
             
-        self.send_cmd(self.low_cmd)
+        self.send_cmd()
     
     def ToZeroTorque(self):
-        print("Enter zero torque state.")
-        print("Waiting for the start signal...")
+        logger.info("Enter zero torque state.")
+        logger.info("Waiting for the start signal...")
         while self.joystick.button[KeyMap.start] != 1:
             create_zero_cmd(self.low_cmd)
-            self.send_cmd(self.low_cmd)
+            self.send_cmd()
             time.sleep(self.dt)
     
     def ToDefaultPose(self):
-        print("Moving to default pos.")
+        logger.info("Moving to default pos.")
         total_time: float = 2
         num_step = int(total_time / self.dt)
         
@@ -357,12 +372,12 @@ class RealRobot(URCIRobot, LowLevelMagic):
                 self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 直接使用预计算值
                 self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 直接使用预计算值
                 self.low_cmd.motor_cmd[j].tau = 0
-            self.send_cmd(self.low_cmd)
+            self.send_cmd()
             time.sleep(self.dt)
             
     def KeepDefaultPose(self):
-        print("Enter default pos state.")
-        print("Waiting for the Button A signal...")
+        logger.info("Enter default pos state.")
+        logger.info("Waiting for the Button A signal...")
         
         end_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
         
@@ -378,7 +393,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
                 self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 直接使用预计算值
                 self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 直接使用预计算值
                 self.low_cmd.motor_cmd[j].tau = 0
-            self.send_cmd(self.low_cmd)
+            self.send_cmd()
             time.sleep(self.dt)
 
 
