@@ -4,8 +4,8 @@
 #   - reward_base
 
 rewards:
-  set_reward: Yuanhang
-  set_reward_date: 20250206
+  set_reward: Weiji
+  set_reward_date: 20250306
   only_positive_rewards: False
   reward_scales:
       tracking_lin_vel: 1.0
@@ -30,14 +30,14 @@ rewards:
       # termination: -500.0
       # penalty_in_the_air: -100.0
       # feet_max_height_for_this_air: -100.0
-      upperbody_joint_angle_freeze: -0.2
+      upperbody_joint_angle_freeze: -0.05
       feet_heading_alignment: -0.3
       penalty_close_feet_xy: -10.
       penalty_ang_vel_xy_torso: -1.0
       penalty_hip_pos: -1.0
 
       # custom reward
-      collision: -100
+      collision: -1000
 
   reward_tracking_sigma:
     lin_vel: 0.25
