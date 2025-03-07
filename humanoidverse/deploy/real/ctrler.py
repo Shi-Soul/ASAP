@@ -210,6 +210,16 @@ class RealRobot(URCIRobot, LowLevelMagic):
 
         self.kp_real = np.zeros(self.num_real_dofs)
         self.kd_real = np.zeros(self.num_real_dofs)
+        
+        # 填充有效关节的kp/kd
+        for i, j in enumerate(self.dof_idx_23_to_29):
+            self.kp_real[j] = self.kp[i]
+            self.kd_real[j] = self.kd[i]
+            
+        # 填充锁定关节的kp/kd
+        for j in self.dof_idx_locked:
+            self.kp_real[j] = self.locked_kp
+            self.kd_real[j] = self.locked_kd
     
     def GetState(self):
         # q,dq
@@ -289,25 +299,25 @@ class RealRobot(URCIRobot, LowLevelMagic):
     # self.low_cmd.motor_cmd is designed to be **Stateless**
     # Each time you call the following CMD function,
     # you should assume that the previous low_cmd is randomly generated
-    
     def SetPose(self, pose: np.ndarray):
         assert pose.shape == (self.num_dofs,)
         
-        for i,j in enumerate(self.dof_idx_23_to_29):
+        for i, j in enumerate(self.dof_idx_23_to_29):
             self.low_cmd.motor_cmd[j].q = pose[i]
             self.low_cmd.motor_cmd[j].qd = 0
-            self.low_cmd.motor_cmd[j].kp = self.kp[i]
-            self.low_cmd.motor_cmd[j].kd = self.kd[i]
             self.low_cmd.motor_cmd[j].tau = 0
-        for i in self.dof_idx_locked:
-            self.low_cmd.motor_cmd[i].q = 0
-            self.low_cmd.motor_cmd[i].qd = 0
-            self.low_cmd.motor_cmd[i].tau = 0
-            self.low_cmd.motor_cmd[i].kp = self.locked_kp
-            self.low_cmd.motor_cmd[i].kd = self.locked_kd
+            self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 使用预计算值
+            self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 使用预计算值
+            
+        # 锁定关节的kp/kd
+        for j in self.dof_idx_locked:
+            self.low_cmd.motor_cmd[j].q = 0
+            self.low_cmd.motor_cmd[j].qd = 0
+            self.low_cmd.motor_cmd[j].tau = 0
+            self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 使用预计算值
+            self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 使用预计算值
+            
         self.send_cmd(self.low_cmd)
-        
-        raise NotImplementedError("Not implemented")
     
     def ToZeroTorque(self):
         # raise NotImplementedError("Not implemented")
@@ -317,67 +327,47 @@ class RealRobot(URCIRobot, LowLevelMagic):
             create_zero_cmd(self.low_cmd)
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
-
+    
     def ToDefaultPose(self):
         print("Moving to default pos.")
-        # move time 2s
         total_time: float = 2
         num_step = int(total_time / self.dt)
         
-        
         start_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
-        end_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
-        kp_expanded = np.zeros(self.num_real_dofs, dtype=np.float32)
-        kd_expanded = np.zeros(self.num_real_dofs, dtype=np.float32)
-        for i in range(self.num_real_dofs):
-            start_dof_pos[i] = self.low_state.motor_state[i].q
-
-        for i,j in enumerate(self.dof_idx_23_to_29):
-            end_dof_pos[j] = self.dof_init_pose[i]
-            kp_expanded[j] = self.kp[i]
-            kd_expanded[j] = self.kd[i]
-        for i in self.dof_idx_locked:
-            end_dof_pos[i] = 0 # TODO: for now, let's assume those locked dofs are at zero pos
-            kp_expanded[i] = self.locked_kp
-            kd_expanded[i] = self.locked_kd
+        end_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)# 锁定关节位置设为0
         
-        # move to default pos
-        for i in range(num_step+1):
+        for i, j in enumerate(self.dof_idx_23_to_29):
+            end_dof_pos[j] = self.dof_init_pose[i]
+            
+        # 移动到默认姿态
+        for i in range(num_step + 1):
             alpha = i / num_step
             for j in range(self.num_real_dofs):
-                motor_idx = j
-                self.low_cmd.motor_cmd[motor_idx].q = start_dof_pos[j] * (1 - alpha) + end_dof_pos[j] * alpha
-                self.low_cmd.motor_cmd[motor_idx].qd = 0
-                self.low_cmd.motor_cmd[motor_idx].kp = kp_expanded[j]
-                self.low_cmd.motor_cmd[motor_idx].kd = kd_expanded[j]
-                self.low_cmd.motor_cmd[motor_idx].tau = 0
+                self.low_cmd.motor_cmd[j].q = start_dof_pos[j] * (1 - alpha) + end_dof_pos[j] * alpha
+                self.low_cmd.motor_cmd[j].qd = 0
+                self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 直接使用预计算值
+                self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 直接使用预计算值
+                self.low_cmd.motor_cmd[j].tau = 0
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
-            
     def KeepDefaultPose(self):
         print("Enter default pos state.")
         print("Waiting for the Button A signal...")
         
         end_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
-        kp_expanded = np.zeros(self.num_real_dofs, dtype=np.float32)
-        kd_expanded = np.zeros(self.num_real_dofs, dtype=np.float32)
-
-        for i,j in enumerate(self.dof_idx_23_to_29):
+        
+        # 初始化目标位置
+        for i, j in enumerate(self.dof_idx_23_to_29):
             end_dof_pos[j] = self.dof_init_pose[i]
-            kp_expanded[j] = self.kp[i]
-            kd_expanded[j] = self.kd[i]
-        for i in self.dof_idx_locked:
-            end_dof_pos[i] = 0 # TODO: for now, let's assume those locked dofs are at zero pos
-            kp_expanded[i] = self.locked_kp
-            kd_expanded[i] = self.locked_kd
             
+        # 保持默认姿态
         while self.joystick.button[KeyMap.A] != 1:
-            for i in range(self.num_real_dofs):
-                self.low_cmd.motor_cmd[i].q = end_dof_pos[i]
-                self.low_cmd.motor_cmd[i].qd = 0
-                self.low_cmd.motor_cmd[i].kp = kp_expanded[i]
-                self.low_cmd.motor_cmd[i].kd = kd_expanded[i]
-                self.low_cmd.motor_cmd[i].tau = 0
+            for j in range(self.num_real_dofs):
+                self.low_cmd.motor_cmd[j].q = end_dof_pos[j]
+                self.low_cmd.motor_cmd[j].qd = 0
+                self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 直接使用预计算值
+                self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 直接使用预计算值
+                self.low_cmd.motor_cmd[j].tau = 0
             self.send_cmd(self.low_cmd)
             time.sleep(self.dt)
 
