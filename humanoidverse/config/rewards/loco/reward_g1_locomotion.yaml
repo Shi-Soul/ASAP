@@ -5,7 +5,7 @@
 
 rewards:
   set_reward: Weiji
-  set_reward_date: 20250306
+  set_reward_date: 20250310
   only_positive_rewards: False
   reward_scales:
       tracking_lin_vel: 1.0
@@ -37,7 +37,7 @@ rewards:
       penalty_hip_pos: -1.0
 
       # custom reward
-      collision: -1000
+      collision: -1.0
 
   reward_tracking_sigma:
     lin_vel: 0.25

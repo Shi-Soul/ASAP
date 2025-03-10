@@ -11,7 +11,7 @@ python humanoidverse/train_agent.py \
 +robot=g1/g1_23dof_lock_wrist \
 +terrain=terrain_locomotion_plane \
 +obs=loco/leggedloco_obs_history_wjx \
-robot.asset.urdf_file="g1/g1_23dof_lock_wrist_custom_collision.urdf" \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
 num_envs=4096 \
 project_name=G1Loco \
 experiment_name=v0Coll \
