@@ -167,6 +167,11 @@ class MujocoRobot(URCIRobot):
                     self.cmd = np.array(self.cfg.deploy.defcmd)
                 elif key == glfw.KEY_ENTER:
                     self.Reset()
+                elif key == glfw.KEY_LEFT_BRACKET:
+                    self._ref_pid -= 1
+                elif key == glfw.KEY_RIGHT_BRACKET:
+                    self._ref_pid += 1
+                
                 print(self.cmd)
             self.viewer._key_callback(window, key, scancode, action, mods)
         glfw.set_key_callback(self.viewer.window, _key_callback)

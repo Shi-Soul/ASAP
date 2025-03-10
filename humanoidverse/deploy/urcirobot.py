@@ -46,13 +46,20 @@ class URCIRobot:
             
             
             if cur_pid != self._ref_pid:
+                self._ref_pid %= len(cfg_policies)
                 assert self._ref_pid >= 0 and self._ref_pid < len(cfg_policies), f"Invalid policy id: {self._ref_pid}"
                 cur_pid = self._ref_pid
                 self._obs_cfg_obs = cfg_policies[cur_pid][0]
                 policy_fn = cfg_policies[cur_pid][1]
-                # TODO: cleaning history about 'ref_motion_phase'
+                
+                # TODO: cleaning state, history about 'ref_motion_phase'
+                self.subtimer=0
+                self.timer=0 # TODO unify it.
+                self.history_handler.history['ref_motion_phase']*=0
                 
                 self.UpdateObsWoHistory()
+                
+                breakpoint()
             
             action = policy_fn(self.Obs())[0]
             
@@ -262,6 +269,7 @@ class URCIRobot:
         return np2torch(self.act)
     
     def _get_obs_base_pos_z(self,):
+        # raise NotImplementedError("Not Implemented")
         return np2torch(self.pos[2:3])
     
     def _get_obs_feet_contact_force(self,):
@@ -270,6 +278,7 @@ class URCIRobot:
           
     
     def _get_obs_base_lin_vel(self,):
+        # raise NotImplementedError("Not Implemented")
         return np2torch(self.vel)
     
     def _get_obs_base_ang_vel(self,):
