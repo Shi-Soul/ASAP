@@ -1,16 +1,19 @@
-from typing import Dict, List, Tuple, Callable
+from typing import Dict, List, Tuple, Callable, Optional
 import numpy as np
 from omegaconf import OmegaConf
 from loguru import logger
 from humanoidverse.envs.env_utils.history_handler import HistoryHandler
 from humanoidverse.utils.motion_lib.motion_lib_robot import MotionLibRobot
+from humanoidverse.utils.helpers import parse_observation
 import time
+import torch
 
 class URCIRobot:
     REAL: bool
     BYPASS_ACT: bool
     
     dt: float # big dt, not small dt
+    clip_observations: float
     cfg: OmegaConf
     
     q: np.ndarray
@@ -24,10 +27,19 @@ class URCIRobot:
     
     act: np.ndarray
     
+    _obs_cfg_obs: Optional[OmegaConf]=None
+    
     def __init__(self, cfg: OmegaConf):
         self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
     
     def switching(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
+        policy_id = 0
+        
+        self._obs_cfg_obs = cfg_policies[policy_id][0]
+        policy_fn = cfg_policies[policy_id][1]
+        
+        self.looping(policy_fn)
+        
         raise NotImplementedError("Not implemented")
         ...
     
@@ -63,6 +75,47 @@ class URCIRobot:
     
     def Obs(self)->Dict[str, np.ndarray]:
         raise NotImplementedError("Not implemented")
+    
+    def GetState(self):
+        raise NotImplementedError("Not implemented")
+    
+    def UpdateObs(self):
+        self.GetState()
+        
+        hist_cfg_obs = self.cfg.obs
+        obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
+        
+        self.obs_buf_dict_raw = {}
+        self.hist_obs_dict = {}
+        
+        noise_extra_scale = 1.
+        for obs_key, obs_config in obs_cfg_obs.obs_dict.items():
+            if not obs_key=='actor_obs': continue
+            self.obs_buf_dict_raw[obs_key] = dict()
+
+            parse_observation(self, obs_config, self.obs_buf_dict_raw[obs_key], obs_cfg_obs.obs_scales, obs_cfg_obs.noise_scales, noise_extra_scale)
+        
+        # Compute history observations
+        history_obs_list = self.history_handler.history.keys()
+        parse_observation(self, history_obs_list, self.hist_obs_dict, hist_cfg_obs.obs_scales, hist_cfg_obs.noise_scales, noise_extra_scale)
+        
+        
+        self.obs_buf_dict = dict()
+        
+        for obs_key, obs_config in obs_cfg_obs.obs_dict.items():
+            if not obs_key=='actor_obs': continue
+            obs_keys = sorted(obs_config)
+            # print("obs_keys", obs_keys)            
+            self.obs_buf_dict[obs_key] = torch.cat([self.obs_buf_dict_raw[obs_key][key] for key in obs_keys], dim=-1)
+            
+            
+        clip_obs = self.clip_observations
+        for obs_key, obs_val in self.obs_buf_dict.items():
+            if not obs_key=='actor_obs': continue
+            self.obs_buf_dict[obs_key] = torch.clip(obs_val, -clip_obs, clip_obs)
+
+        for key in self.history_handler.history.keys():
+            self.history_handler.add(key, self.hist_obs_dict[key])
     
     def _check_init(self):
         assert self.dt is not None, "dt is not set"

@@ -27,7 +27,7 @@ import logging
 from utils.config_utils import *  # noqa: E402, F403
 # add argparse arguments
 
-from typing import Dict
+from typing import Dict, Optional
 from humanoidverse.utils.config_utils import *  # noqa: E402, F403
 from loguru import logger
 
@@ -269,41 +269,7 @@ class MujocoRobot(URCIRobot):
         self.UpdateObs()
 
 
-    def UpdateObs(self):
-        self.GetState()
-        
-        
-        self.obs_buf_dict_raw = {}
-        self.hist_obs_dict = {}
-        
-        noise_extra_scale = 1.
-        for obs_key, obs_config in self.cfg.obs.obs_dict.items():
-            if not obs_key=='actor_obs': continue
-            self.obs_buf_dict_raw[obs_key] = dict()
 
-            parse_observation(self, obs_config, self.obs_buf_dict_raw[obs_key], self.cfg.obs.obs_scales, self.cfg.obs.noise_scales, noise_extra_scale)
-        
-        # Compute history observations
-        history_obs_list = self.history_handler.history.keys()
-        parse_observation(self, history_obs_list, self.hist_obs_dict, self.cfg.obs.obs_scales, self.cfg.obs.noise_scales, noise_extra_scale)
-        
-        
-        self.obs_buf_dict = dict()
-        
-        for obs_key, obs_config in self.cfg.obs.obs_dict.items():
-            if not obs_key=='actor_obs': continue
-            obs_keys = sorted(obs_config)
-            # print("obs_keys", obs_keys)            
-            self.obs_buf_dict[obs_key] = torch.cat([self.obs_buf_dict_raw[obs_key][key] for key in obs_keys], dim=-1)
-            
-            
-        clip_obs = self.clip_observations
-        for obs_key, obs_val in self.obs_buf_dict.items():
-            if not obs_key=='actor_obs': continue
-            self.obs_buf_dict[obs_key] = torch.clip(obs_val, -clip_obs, clip_obs)
-
-        for key in self.history_handler.history.keys():
-            self.history_handler.add(key, self.hist_obs_dict[key])
             
         # breakpoint()
 
@@ -496,7 +462,7 @@ def main(override_config: OmegaConf):
             config = OmegaConf.merge(train_config, override_config)
                     
             ckpt_num = path.split('/')[-1].split('_')[-1].split('.')[0]
-            config.checkpoint = path
+            config.checkpoint = checkpoint
             config.env.config.save_rendering_dir = str(checkpoint.parent / "renderings" / f"ckpt_{ckpt_num}")
             config.env.config.ckpt_dir = str(checkpoint.parent) # commented out for now, might need it back to save motion
             OmegaConf.set_struct(config, False)
@@ -609,8 +575,6 @@ def main(override_config: OmegaConf):
             OmegaConf.load("humanoidverse/config/deploy/multiple.yaml"),
         )
         
-        breakpoint()
-        
         is_single_policy = isinstance(override_config.checkpoint, str) and override_config.checkpoint.endswith(".onnx") 
         is_multiple_policy = isinstance(override_config.checkpoint, ListConfig)
         
@@ -621,18 +585,9 @@ def main(override_config: OmegaConf):
         if is_single_policy:
             config = load_raw_ckpt_config(override_config.checkpoint, override_config)
             config = OmegaConf.merge(config, single_policy_config)
-            return config.deploy.deploy_mode, (config, override_config.checkpoint)
+            return config.deploy.deploy_mode, (config, config.checkpoint)
         
         elif is_multiple_policy:
-            sub_configs = [load_raw_ckpt_config(path, override_config) for path in (override_config.checkpoint)]
-            
-            main_cfg = OmegaConf.merge(sub_configs[0], multiple_policy_config)
-            
-            for sub_cfg in sub_configs:
-                check_compatibility_config_robot(main_cfg, sub_cfg)
-                check_compatibility_config_obs(main_cfg, sub_cfg)
-            
-            # TODO:
             # 1. load multiple configs
             # 2. check the compatibility of different configs
                 # * check terms: 
@@ -647,6 +602,15 @@ def main(override_config: OmegaConf):
                     # Others: don't care
 
             # 3. return one merged config with multiple sub-configs
+            
+            sub_configs = [load_raw_ckpt_config(path, override_config) for path in (override_config.checkpoint)]
+            
+            main_cfg = OmegaConf.merge(sub_configs[0], multiple_policy_config)
+            
+            for sub_cfg in sub_configs:
+                # TODO: check more cfg, not only robot and obs
+                check_compatibility_config_robot(main_cfg, sub_cfg)
+                check_compatibility_config_obs(main_cfg, sub_cfg)
             
             return main_cfg.deploy.deploy_mode, {
                 'main': main_cfg,
@@ -686,6 +650,9 @@ def main(override_config: OmegaConf):
             # result = session.run([output_name], {input_name: obs_dict})
             # result = session.run([output_name], {input_name: obs})
             return result[0]
+        
+        breakpoint()
+        
         return policy_fn
         
     
@@ -715,6 +682,7 @@ def main(override_config: OmegaConf):
         policy_fn = load_policy(config, checkpoint)
         robot.looping(policy_fn)
     elif deploy_mode == 'multiple':
+        [pre_process_config(cfg) for cfg in sub_configs]
         cfg_policies = [(cfg.obs, load_policy(cfg, cfg.checkpoint)) for cfg in sub_configs]
         robot.switching(cfg_policies)
     else:

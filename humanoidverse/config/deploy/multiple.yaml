@@ -1,10 +1,12 @@
 
-defaults:
-  - deploy/single
-  - _self_
 
 deploy:
   deploy_mode: "multiple"
+
+robot:
+  motion:
+    motion_file: "/home/bai/ASAP/SharedMotions"
+log_task_name: motion_tracking # just for compatibility, don't think about it
 
 
 obs:
