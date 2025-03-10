@@ -302,8 +302,9 @@ class URCIRobot:
         return self._obs_vr_3point_pos
     
     def _get_obs_history(self,):
-        assert "history" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['history']
+        obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
+        assert "history" in obs_cfg_obs.obs_auxiliary.keys()
+        history_config = obs_cfg_obs.obs_auxiliary['history']
         history_key_list = history_config.keys()
         history_tensors = []
         for key in sorted(history_config.keys()):
@@ -314,8 +315,9 @@ class URCIRobot:
         return torch.cat(history_tensors, dim=1).reshape(-1)
     
     def _get_obs_short_history(self,):
-        assert "short_history" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['short_history']
+        obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
+        assert "short_history" in obs_cfg_obs.obs_auxiliary.keys()
+        history_config = obs_cfg_obs.obs_auxiliary['short_history']
         history_key_list = history_config.keys()
         history_tensors = []
         for key in sorted(history_config.keys()):
@@ -326,8 +328,9 @@ class URCIRobot:
         return torch.cat(history_tensors, dim=1).reshape(-1)
     
     def _get_obs_long_history(self,):
-        assert "long_history" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['long_history']
+        obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
+        assert "long_history" in obs_cfg_obs.obs_auxiliary.keys()
+        history_config = obs_cfg_obs.obs_auxiliary['long_history']
         history_key_list = history_config.keys()
         history_tensors = []
         for key in sorted(history_config.keys()):
@@ -338,8 +341,9 @@ class URCIRobot:
         return torch.cat(history_tensors, dim=1).reshape(-1)
     
     def _get_obs_history_actor(self,):
-        assert "history_actor" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['history_actor']
+        obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
+        assert "history_actor" in obs_cfg_obs.obs_auxiliary.keys()
+        history_config = obs_cfg_obs.obs_auxiliary['history_actor']
         history_key_list = history_config.keys()
         history_tensors = []
         for key in sorted(history_config.keys()):
@@ -350,8 +354,9 @@ class URCIRobot:
         return torch.cat(history_tensors, dim=1).reshape(-1)
     
     def _get_obs_history_critic(self,):
-        assert "history_critic" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['history_critic']
+        obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
+        assert "history_critic" in obs_cfg_obs.obs_auxiliary.keys()
+        history_config = obs_cfg_obs.obs_auxiliary['history_critic']
         history_key_list = history_config.keys()
         history_tensors = []
         for key in sorted(history_config.keys()):
