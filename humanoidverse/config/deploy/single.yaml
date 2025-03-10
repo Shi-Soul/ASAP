@@ -1,5 +1,7 @@
 
 deploy:
+  deploy_mode: "single"
+  
   BYPASS_ACT: False
 
   render: True

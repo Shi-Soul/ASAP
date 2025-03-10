@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, List, Tuple, Callable
 import numpy as np
 from omegaconf import OmegaConf
 from loguru import logger
@@ -27,6 +27,9 @@ class URCIRobot:
     def __init__(self, cfg: OmegaConf):
         self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
     
+    def switching(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
+        raise NotImplementedError("Not implemented")
+        ...
     
     def looping(self, policy_fn):
         self._check_init()
