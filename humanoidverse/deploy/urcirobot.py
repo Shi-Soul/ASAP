@@ -32,11 +32,13 @@ class URCIRobot:
     def __init__(self, cfg: OmegaConf):
         self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
     
-    def switching(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
+    def routing(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
         policy_id = 0
         
         self._obs_cfg_obs = cfg_policies[policy_id][0]
         policy_fn = cfg_policies[policy_id][1]
+        self.UpdateObsWoHistory()
+        
         
         self.looping(policy_fn)
         
@@ -78,6 +80,36 @@ class URCIRobot:
     
     def GetState(self):
         raise NotImplementedError("Not implemented")
+    
+    def UpdateObsWoHistory(self):
+        
+        obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
+        
+        self.obs_buf_dict_raw = {}
+        
+        noise_extra_scale = 1.
+        for obs_key, obs_config in obs_cfg_obs.obs_dict.items():
+            if not obs_key=='actor_obs': continue
+            self.obs_buf_dict_raw[obs_key] = dict()
+
+            parse_observation(self, obs_config, self.obs_buf_dict_raw[obs_key], obs_cfg_obs.obs_scales, obs_cfg_obs.noise_scales, noise_extra_scale)
+        
+        self.obs_buf_dict = dict()
+        
+        for obs_key, obs_config in obs_cfg_obs.obs_dict.items():
+            if not obs_key=='actor_obs': continue
+            obs_keys = sorted(obs_config)
+            # print("obs_keys", obs_keys)            
+            self.obs_buf_dict[obs_key] = torch.cat([self.obs_buf_dict_raw[obs_key][key] for key in obs_keys], dim=-1)
+            
+            
+        clip_obs = self.clip_observations
+        for obs_key, obs_val in self.obs_buf_dict.items():
+            if not obs_key=='actor_obs': continue
+            self.obs_buf_dict[obs_key] = torch.clip(obs_val, -clip_obs, clip_obs)
+
+        
+        
     
     def UpdateObs(self):
         self.GetState()

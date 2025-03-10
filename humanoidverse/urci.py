@@ -401,7 +401,7 @@ def main(override_config: OmegaConf):
         export CKPTS="[/path/to/ckp1.onnx,/path/to/ckp2.onnx,/path/to/ckp3.onnx]"
         python humanoidverse/urci.py +simulator=mujoco +checkpoint=$CKPTS
         
-        export CKPTS="[/home/bai/ASAP/logs/G1Loco/20250310_114518-v0Coll-locomotion-g1_23dof_lock_wrist/exported/model_4100.onnx,/home/bai/ASAP/logs/SharedCKPT/20250307_135730-original_collision_add_dr_collision_0.01-motion_tracking-g1_23dof_lock_wrist/exported/model_46300.onnx]"
+        export CKPTS="[/home/bai/ASAP/logs/G1Loco/20250310_114838-v0CollNoDR-locomotion-g1_23dof_lock_wrist/exported/model_6300.onnx,/home/bai/ASAP/logs/SharedCKPT/20250307_135730-original_collision_add_dr_collision_0.01-motion_tracking-g1_23dof_lock_wrist/exported/model_46300.onnx]"
         HYDRA_FULL_ERROR=1 python humanoidverse/urci.py +simulator=mujoco +checkpoint=$CKPTS
     
     """
@@ -684,7 +684,7 @@ def main(override_config: OmegaConf):
     elif deploy_mode == 'multiple':
         [pre_process_config(cfg) for cfg in sub_configs]
         cfg_policies = [(cfg.obs, load_policy(cfg, cfg.checkpoint)) for cfg in sub_configs]
-        robot.switching(cfg_policies)
+        robot.routing(cfg_policies)
     else:
         raise ValueError(f"Invalid deploy mode: {deploy_mode}")
     
