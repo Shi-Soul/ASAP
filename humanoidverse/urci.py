@@ -278,115 +278,6 @@ class MujocoRobot(URCIRobot):
         # return {k: torch2np(v) for k, v in self.obs_buf_dict.items()}
         return {'actor_obs': torch2np(self.obs_buf_dict['actor_obs']).reshape(1, -1)}
 
-    ######################### Observations #########################
-    def _get_obs_command_lin_vel(self):
-        return np2torch(self.cmd[:2])
-    
-    def _get_obs_command_ang_vel(self):
-        return np2torch(self.cmd[2:3])
-    
-    def _get_obs_actions(self,):
-        return np2torch(self.act)
-    
-    def _get_obs_base_pos_z(self,):
-        return np2torch(self.pos[2:3])
-    
-    def _get_obs_feet_contact_force(self,):
-        raise NotImplementedError("Not implemented")
-        return self.data.contact.force[:, :].view(self.num_envs, -1)
-          
-    
-    def _get_obs_base_lin_vel(self,):
-        return np2torch(self.vel)
-    
-    def _get_obs_base_ang_vel(self,):
-        return np2torch(self.omega)
-    
-    def _get_obs_projected_gravity(self,):
-        return np2torch(self.gvec)
-    
-    def _get_obs_dof_pos(self,):
-        return np2torch(self.q - self.dof_init_pose)
-    
-    def _get_obs_dof_vel(self,):
-        return np2torch(self.dq)
-    
-    
-    def _get_obs_ref_motion_phase(self):
-        logger.info(f"Phase: {self.ref_motion_phase}")
-        return torch.tensor(self.ref_motion_phase).reshape(1,)
-    
-    def _get_obs_dif_local_rigid_body_pos(self):
-        raise NotImplementedError("Not implemented")
-        return self._obs_dif_local_rigid_body_pos
-    
-    def _get_obs_local_ref_rigid_body_pos(self):
-        raise NotImplementedError("Not implemented")
-        return self._obs_local_ref_rigid_body_pos
-    
-    def _get_obs_vr_3point_pos(self):
-        raise NotImplementedError("Not implemented")
-        return self._obs_vr_3point_pos
-    
-    def _get_obs_history(self,):
-        assert "history" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['history']
-        history_key_list = history_config.keys()
-        history_tensors = []
-        for key in sorted(history_config.keys()):
-            history_length = history_config[key]
-            history_tensor = self.history_handler.query(key)[:, :history_length]
-            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
-            history_tensors.append(history_tensor)
-        return torch.cat(history_tensors, dim=1).reshape(-1)
-    
-    def _get_obs_short_history(self,):
-        assert "short_history" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['short_history']
-        history_key_list = history_config.keys()
-        history_tensors = []
-        for key in sorted(history_config.keys()):
-            history_length = history_config[key]
-            history_tensor = self.history_handler.query(key)[:, :history_length]
-            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
-            history_tensors.append(history_tensor)
-        return torch.cat(history_tensors, dim=1).reshape(-1)
-    
-    def _get_obs_long_history(self,):
-        assert "long_history" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['long_history']
-        history_key_list = history_config.keys()
-        history_tensors = []
-        for key in sorted(history_config.keys()):
-            history_length = history_config[key]
-            history_tensor = self.history_handler.query(key)[:, :history_length]
-            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
-            history_tensors.append(history_tensor)
-        return torch.cat(history_tensors, dim=1).reshape(-1)
-    
-    def _get_obs_history_actor(self,):
-        assert "history_actor" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['history_actor']
-        history_key_list = history_config.keys()
-        history_tensors = []
-        for key in sorted(history_config.keys()):
-            history_length = history_config[key]
-            history_tensor = self.history_handler.query(key)[:, :history_length]
-            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
-            history_tensors.append(history_tensor)
-        return torch.cat(history_tensors, dim=1).reshape(-1)
-    
-    def _get_obs_history_critic(self,):
-        assert "history_critic" in self.cfg.obs.obs_auxiliary.keys()
-        history_config = self.cfg.obs.obs_auxiliary['history_critic']
-        history_key_list = history_config.keys()
-        history_tensors = []
-        for key in sorted(history_config.keys()):
-            history_length = history_config[key]
-            history_tensor = self.history_handler.query(key)[:, :history_length]
-            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)
-            history_tensors.append(history_tensor)
-        return torch.cat(history_tensors, dim=1).reshape(-1)
 
 from wjxtools import pdb_decorator
 @hydra.main(config_path="config", config_name="base_eval")
@@ -650,9 +541,7 @@ def main(override_config: OmegaConf):
             # result = session.run([output_name], {input_name: obs_dict})
             # result = session.run([output_name], {input_name: obs})
             return result[0]
-        
-        breakpoint()
-        
+                
         return policy_fn
         
     

@@ -8,6 +8,10 @@ from humanoidverse.utils.helpers import parse_observation
 import time
 import torch
 
+np2torch = lambda x: torch.tensor(x, dtype=torch.float32)
+torch2np = lambda x: x.cpu().numpy()
+
+
 class URCIRobot:
     REAL: bool
     BYPASS_ACT: bool
@@ -28,21 +32,43 @@ class URCIRobot:
     act: np.ndarray
     
     _obs_cfg_obs: Optional[OmegaConf]=None
+    _ref_pid = 0 # reference policy id
     
     def __init__(self, cfg: OmegaConf):
         self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
     
     def routing(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
-        policy_id = 0
+        self._check_init()
+        cur_pid = -1
         
-        self._obs_cfg_obs = cfg_policies[policy_id][0]
-        policy_fn = cfg_policies[policy_id][1]
-        self.UpdateObsWoHistory()
+        while True:
+            t1 = time.time()
+            
+            
+            if cur_pid != self._ref_pid:
+                assert self._ref_pid >= 0 and self._ref_pid < len(cfg_policies), f"Invalid policy id: {self._ref_pid}"
+                cur_pid = self._ref_pid
+                self._obs_cfg_obs = cfg_policies[cur_pid][0]
+                policy_fn = cfg_policies[cur_pid][1]
+                # TODO: cleaning history about 'ref_motion_phase'
+                
+                self.UpdateObsWoHistory()
+            
+            action = policy_fn(self.Obs())[0]
+            
+            if self.BYPASS_ACT: action = np.zeros_like(action)
+            
+            self.ApplyAction(action)
+            
+            t2 = time.time()
+            
+            if self.REAL:
+                remain_dt = self.dt - (t2-t1)
+                if remain_dt > 0:
+                    time.sleep(remain_dt)
+                else:
+                    logger.warning(f"Warning! delay = {t2-t1} longer than policy_dt = {self.dt} , skip sleeping")
         
-        
-        self.looping(policy_fn)
-        
-        raise NotImplementedError("Not implemented")
         ...
     
     def looping(self, policy_fn):
@@ -82,6 +108,7 @@ class URCIRobot:
         raise NotImplementedError("Not implemented")
     
     def UpdateObsWoHistory(self):
+        self.GetState()
         
         obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
         
@@ -108,9 +135,6 @@ class URCIRobot:
             if not obs_key=='actor_obs': continue
             self.obs_buf_dict[obs_key] = torch.clip(obs_val, -clip_obs, clip_obs)
 
-        
-        
-    
     def UpdateObs(self):
         self.GetState()
         
@@ -225,3 +249,114 @@ class URCIRobot:
         # breakpoint()
         ...
         
+        
+    
+    ######################### Observations #########################
+    def _get_obs_command_lin_vel(self):
+        return np2torch(self.cmd[:2])
+    
+    def _get_obs_command_ang_vel(self):
+        return np2torch(self.cmd[2:3])
+    
+    def _get_obs_actions(self,):
+        return np2torch(self.act)
+    
+    def _get_obs_base_pos_z(self,):
+        return np2torch(self.pos[2:3])
+    
+    def _get_obs_feet_contact_force(self,):
+        raise NotImplementedError("Not implemented")
+        return self.data.contact.force[:, :].view(self.num_envs, -1)
+          
+    
+    def _get_obs_base_lin_vel(self,):
+        return np2torch(self.vel)
+    
+    def _get_obs_base_ang_vel(self,):
+        return np2torch(self.omega)
+    
+    def _get_obs_projected_gravity(self,):
+        return np2torch(self.gvec)
+    
+    def _get_obs_dof_pos(self,):
+        return np2torch(self.q - self.dof_init_pose)
+    
+    def _get_obs_dof_vel(self,):
+        return np2torch(self.dq)
+    
+    
+    def _get_obs_ref_motion_phase(self):
+        logger.info(f"Phase: {self.ref_motion_phase}")
+        return torch.tensor(self.ref_motion_phase).reshape(1,)
+    
+    def _get_obs_dif_local_rigid_body_pos(self):
+        raise NotImplementedError("Not implemented")
+        return self._obs_dif_local_rigid_body_pos
+    
+    def _get_obs_local_ref_rigid_body_pos(self):
+        raise NotImplementedError("Not implemented")
+        return self._obs_local_ref_rigid_body_pos
+    
+    def _get_obs_vr_3point_pos(self):
+        raise NotImplementedError("Not implemented")
+        return self._obs_vr_3point_pos
+    
+    def _get_obs_history(self,):
+        assert "history" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['history']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
+    
+    def _get_obs_short_history(self,):
+        assert "short_history" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['short_history']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
+    
+    def _get_obs_long_history(self,):
+        assert "long_history" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['long_history']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
+    
+    def _get_obs_history_actor(self,):
+        assert "history_actor" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['history_actor']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)  # Shape: [4096, history_length*obs_dim]
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
+    
+    def _get_obs_history_critic(self,):
+        assert "history_critic" in self.cfg.obs.obs_auxiliary.keys()
+        history_config = self.cfg.obs.obs_auxiliary['history_critic']
+        history_key_list = history_config.keys()
+        history_tensors = []
+        for key in sorted(history_config.keys()):
+            history_length = history_config[key]
+            history_tensor = self.history_handler.query(key)[:, :history_length]
+            history_tensor = history_tensor.reshape(history_tensor.shape[0], -1)
+            history_tensors.append(history_tensor)
+        return torch.cat(history_tensors, dim=1).reshape(-1)
