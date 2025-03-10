@@ -23,10 +23,13 @@ env:
 
     termination:
       terminate_by_contact: False # problematic in isaacgym when g1+terrain
+      terminate_when_close_to_dof_pos_limit: True
+      terminate_when_close_to_dof_vel_limit: True
+      terminate_when_close_to_torque_limit: True
       # terminate_by_lin_vel: False
       # terminate_by_ang_vel: False
       terminate_by_gravity: True
-      terminate_by_low_height: False
+      terminate_by_low_height: True
 
     termination_scales:
       termination_min_base_height : 0.3

@@ -355,7 +355,9 @@ class LeggedRobotBase(BaseTask):
             
             if torch.rand(1) < self.config.termination_probality.terminate_when_close_to_torque_limit:
                 self.reset_buf |= out_of_torque_limits > 0.
-
+                
+        # if self.reset_buf.any():
+        #     breakpoint()
 
     def _update_timeout_buf(self):
         self.time_out_buf |= self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
