@@ -78,13 +78,13 @@ rewards:
   desired_base_height: 0.78
   close_feet_threshold: 0.15
 
-  reward_penalty_curriculum: False
-  reward_initial_penalty_scale : 1.0
+  reward_penalty_curriculum: True
+  reward_initial_penalty_scale : 0.1
   reward_min_penalty_scale: 0.0
   reward_max_penalty_scale: 1.0
   reward_penalty_level_down_threshold: 400
   reward_penalty_level_up_threshold: 700
-  reward_penalty_degree: 0.00001
+  reward_penalty_degree: 0.00003 
   num_compute_average_epl: 10000
 
   reward_penalty_reward_names : [
