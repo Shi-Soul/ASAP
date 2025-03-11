@@ -53,7 +53,7 @@ class URCIRobot:
                 policy_fn = cfg_policies[cur_pid][1]
                 
                 # TODO: cleaning state, history about 'ref_motion_phase'
-                self.subtimer=0
+                self._subtimer=0
                 self.timer=0 # TODO unify it.
                 self.history_handler.history['ref_motion_phase']*=0
                 

@@ -70,18 +70,20 @@ def quaternion_to_euler_array(quat):
 class MujocoRobot(URCIRobot):
     REAL=False
     
-    ACT_EMA: bool = False # Noise
-    RAND_NOISE: bool = False
-    RAND_DELAY: bool = False
-    RAND_MASK : bool = False
+    RAND_NOISE: bool = True
+    RAND_DELAY: bool = True
+    RAND_MASK : bool = True
     
-    ema_alpha = 0.1  # EMA smoothing factor
     noise_ratio = 3e-2
-    delay_ratio = (0.4, 0.8)
-    # delay_ratio = (0.5, 1.5)
-    # delay_ratio = (0.5, 2.0)
-    mask_ratio = 0.8
-    mk_rand_noise = lambda tens, ratio: tens * (1 + np.random.randn(*tens.shape).astype(tens.dtype) * ratio) # type: ignore
+    # delay_ratio = (4, 25) # unit: ms
+    delay_ratio = (4, 20) # unit: ms
+    mask_ratio = 0.7
+    mk_rand_noise = lambda tens, ratio: (
+                                            (tens * (1 + torch.randn_like(tens) * ratio) ) 
+                                    if isinstance(tens, torch.Tensor) 
+                                    else    (tens * (1 + np.random.randn(*tens.shape).astype(tens.dtype) * ratio)) )# type: ignore
+    # mk_rand_noise = lambda tens, ratio: tens * (1 + np.random.randn(*tens.shape).astype(tens.dtype) * ratio) # type: ignore
+    
     print_torque = lambda tau: print(f"tau (norm, max) = {np.linalg.norm(tau):.2f}, \t{np.max(tau):.2f}", end='\r')
     
     def __init__(self, cfg):
@@ -92,7 +94,7 @@ class MujocoRobot(URCIRobot):
         self.decimation = cfg.simulator.config.sim.control_decimation
         self.sim_dt = 1/cfg.simulator.config.sim.fps
         self.dt = self.decimation * self.sim_dt
-        self.subtimer = 0
+        self._subtimer = 0
         
         self.clip_action_limit = cfg.robot.control.action_clip_value
         self.clip_observations = cfg.env.config.normalization.clip_observations
@@ -101,7 +103,6 @@ class MujocoRobot(URCIRobot):
         
         self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
         # self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist_phys.xml')
-        # self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1_asap/g1_29dof_anneal_23dof.xml')
         self.data = mujoco.MjData(self.model) # type: ignore
         self.model.opt.timestep = self.sim_dt
         
@@ -186,7 +187,7 @@ class MujocoRobot(URCIRobot):
         self.act[:] = 0
         self.history_handler.reset([0])
 
-        self.subtimer = 0
+        self._subtimer = 0
         
         self.UpdateObs()
         ...
@@ -195,8 +196,8 @@ class MujocoRobot(URCIRobot):
     def pd_control(target_q, q, kp, target_dq, dq, kd):
         '''Calculates torques from position commands
         '''
-        # if MujocoRobot.RAND_NOISE:
-        #     kp,kd = MujocoRobot.mk_rand_noise(np.array([kp, kd]), MujocoRobot.noise_ratio)
+        if MujocoRobot.RAND_NOISE:
+            kp,kd = MujocoRobot.mk_rand_noise(np.array([kp, kd]), MujocoRobot.noise_ratio)
         return (target_q - q) * kp + (target_dq - dq) * kd
 
     def GetState(self):
@@ -223,23 +224,48 @@ class MujocoRobot(URCIRobot):
             self.cmd[2] = np.clip(0.5*wrap_to_pi_float(self.cmd[3] - self.rpy[2]), -1., 1.)
             
         if self.is_motion_tracking:
-            self.motion_time = (self.subtimer/self.decimation) * self.dt 
+            self.motion_time = (self._subtimer/self.decimation) * self.dt 
             self.ref_motion_phase = self.motion_time / self.motion_len
             
         # breakpoint()
     
         
     def ApplyAction(self, action): 
+        if self.RAND_NOISE: action = MujocoRobot.mk_rand_noise(action, MujocoRobot.noise_ratio)
+        
         self.act = action.copy()
         target_q = np.clip(action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
         
+        rand_mask = np.random.random(self.num_actions) < self.mask_ratio
+
+        rand_delay = np.random.randint((1e-3*self.delay_ratio[0])//self.sim_dt, (1e-3*self.delay_ratio[1])//self.sim_dt) * self.RAND_DELAY
+        step_delay = rand_delay//self.decimation
+        substep_delay = rand_delay - step_delay * self.decimation
+        
+        if step_delay ==0:
+            old_action = self.history_handler.history['actions'][0, step_delay]
+            old_trg_q = np.clip(old_action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
+            cur_trg_q = target_q
+        else:
+            old_action = self.history_handler.history['actions'][0, step_delay]
+            cur_action = self.history_handler.history['actions'][0, step_delay+1]
+            old_trg_q = np.clip(old_action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
+            cur_trg_q = np.clip(cur_action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
+                
         for i in range(self.decimation):
             self.GetState()
             
+            if self.RAND_DELAY and i < substep_delay:
+                target_q = old_trg_q
+            elif self.RAND_MASK:
+                target_q = cur_trg_q * rand_mask + old_trg_q.numpy() * (1 - rand_mask)
+            else:
+                target_q = cur_trg_q
+                
             tau = self.pd_control(target_q, self.q, self.kp,
                             0, self.dq, self.kd)  # Calc torques
             
-            # if self.RAND_NOISE: tau = MujocoRobot.mk_rand_noise(tau, MujocoRobot.noise_ratio)
+            if self.RAND_NOISE: tau = MujocoRobot.mk_rand_noise(tau, MujocoRobot.noise_ratio)
             tau = np.clip(tau, -self.tau_limit, self.tau_limit)  # Clamp torques
             
             
@@ -251,25 +277,13 @@ class MujocoRobot(URCIRobot):
 
             mujoco.mj_step(self.model, self.data) # type: ignore
             
-            if np.any(self.data.contact.pos[:,2] > 0.01):
-                names_list = self.model.names.decode('utf-8').split('\x00')[:40]
-                res = np.zeros((6,1),dtype=np.float64)
-                geom_name = lambda x: (names_list[self.model.geom_bodyid[x] + 1])
-                geom_force = lambda x:mujoco.mj_contactForce(self.model,self.data,x,res) #type:ignore
-                
-                for contact in self.data.contact:
-                    if contact.pos[2] > 0.01 and contact.geom1 != 0 and contact.geom2 != 0:
-                        geom1_name = geom_name(contact.geom1)
-                        geom2_name = geom_name(contact.geom2)
-                        print(f"Warning!!! Collision between '{geom1_name,contact.geom1}' and '{geom2_name,contact.geom2}' at position {contact.pos}.")
-                    
-                # breakpoint()
+            self.tracking()
             if self.is_render:
                 if self.viewer.is_alive:
                     self.viewer.render()
                 else:
                     raise Exception("Mujoco Robot Exit")
-            self.subtimer += 1
+            self._subtimer += 1
         
         self.UpdateObs()
 
@@ -281,7 +295,27 @@ class MujocoRobot(URCIRobot):
     def Obs(self):
         
         # return {k: torch2np(v) for k, v in self.obs_buf_dict.items()}
-        return {'actor_obs': torch2np(self.obs_buf_dict['actor_obs']).reshape(1, -1)}
+        
+        actor_obs = torch2np(self.obs_buf_dict['actor_obs']).reshape(1, -1)
+        if self.RAND_NOISE:
+            actor_obs = MujocoRobot.mk_rand_noise(actor_obs, MujocoRobot.noise_ratio)
+        return {
+            'actor_obs': actor_obs
+            }
+
+    def tracking(self):
+        if np.any(self.data.contact.pos[:,2] > 0.01):
+            names_list = self.model.names.decode('utf-8').split('\x00')[:40]
+            res = np.zeros((6,1),dtype=np.float64)
+            geom_name = lambda x: (names_list[self.model.geom_bodyid[x] + 1])
+            geom_force = lambda x:mujoco.mj_contactForce(self.model,self.data,x,res) #type:ignore
+            
+            for contact in self.data.contact:
+                if contact.pos[2] > 0.01 and contact.geom1 != 0 and contact.geom2 != 0:
+                    geom1_name = geom_name(contact.geom1)
+                    geom2_name = geom_name(contact.geom2)
+                    # logger.warning(f"Warning!!! Collision between '{geom1_name,contact.geom1}' and '{geom2_name,contact.geom2}' at position {contact.pos}.")
+                    
 
 
 from wjxtools import pdb_decorator
