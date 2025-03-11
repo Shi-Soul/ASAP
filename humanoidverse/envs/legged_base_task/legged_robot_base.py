@@ -399,6 +399,53 @@ class LeggedRobotBase(BaseTask):
             self._reset_dofs(env_ids)
             self._reset_root_states(env_ids)
 
+
+    def _reset_dofs(self, env_ids, target_state=None):
+        """ Resets DOF position and velocities of selected environmments
+        Positions are randomly selected within 0.5:1.5 x default positions.
+        Velocities are set to zero.
+        If target_state is not None, reset to target_state
+
+        Args:
+            env_ids (List[int]): Environemnt ids
+            target_state (Tensor): Target state
+        """
+        if target_state is not None:
+            self.simulator.dof_pos[env_ids] = target_state[..., 0]
+            self.simulator.dof_vel[env_ids] = target_state[..., 1]
+        else:
+            self.simulator.dof_pos[env_ids] = self.default_dof_pos * torch_rand_float(0.5, 1.5, (len(env_ids), self.num_dof), device=str(self.device))
+            # self.simulator.dof_pos[env_ids] = self.default_dof_pos
+            # import ipdb; ipdb.set_trace()
+            
+            self.simulator.dof_vel[env_ids] = 0.
+
+
+    def _reset_root_states(self, env_ids, target_root_states=None):
+        """ Resets ROOT states position and velocities of selected environmments
+            if target_root_states is not None, reset to target_root_states
+        Args:
+            env_ids (List[int]): Environemnt ids
+            target_root_states (Tensor): Target root states
+        """
+        if target_root_states is not None:
+            self.simulator.robot_root_states[env_ids] = target_root_states
+            self.simulator.robot_root_states[env_ids, :3] += self.env_origins[env_ids]
+
+        else:
+            # base position
+            if self.custom_origins:
+                self.simulator.robot_root_states[env_ids] = self.base_init_state
+                self.simulator.robot_root_states[env_ids, :3] += self.env_origins[env_ids]
+                self.simulator.robot_root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=str(self.device)) # xy position within 1m of the center
+            else:
+                self.simulator.robot_root_states[env_ids] = self.base_init_state
+                self.simulator.robot_root_states[env_ids, :3] += self.env_origins[env_ids]
+            # base velocities
+            
+            self.simulator.robot_root_states[env_ids, 7:13] = torch_rand_float(-0.5, 0.5, (len(env_ids), 6), device=str(self.device)) # [7:10]: lin vel, [10:13]: ang vel
+
+
     def _reset_tasks_callback(self, env_ids):
         self._episodic_domain_randomization(env_ids)
         if self.use_reward_penalty_curriculum:
@@ -826,53 +873,6 @@ class LeggedRobotBase(BaseTask):
     ############ TERRAIN AND COMMANDS
 
     ################ ENV CALLBACKS #################
-
-    def _reset_dofs(self, env_ids, target_state=None):
-        """ Resets DOF position and velocities of selected environmments
-        Positions are randomly selected within 0.5:1.5 x default positions.
-        Velocities are set to zero.
-        If target_state is not None, reset to target_state
-
-        Args:
-            env_ids (List[int]): Environemnt ids
-            target_state (Tensor): Target state
-        """
-        if target_state is not None:
-            self.simulator.dof_pos[env_ids] = target_state[..., 0]
-            self.simulator.dof_vel[env_ids] = target_state[..., 1]
-        else:
-            self.simulator.dof_pos[env_ids] = self.default_dof_pos * torch_rand_float(0.5, 1.5, (len(env_ids), self.num_dof), device=str(self.device))
-            # self.simulator.dof_pos[env_ids] = self.default_dof_pos
-            # import ipdb; ipdb.set_trace()
-            
-            self.simulator.dof_vel[env_ids] = 0.
-
-
-    def _reset_root_states(self, env_ids, target_root_states=None):
-        """ Resets ROOT states position and velocities of selected environmments
-            if target_root_states is not None, reset to target_root_states
-        Args:
-            env_ids (List[int]): Environemnt ids
-            target_root_states (Tensor): Target root states
-        """
-        if target_root_states is not None:
-            self.simulator.robot_root_states[env_ids] = target_root_states
-            self.simulator.robot_root_states[env_ids, :3] += self.env_origins[env_ids]
-
-        else:
-            # base position
-            if self.custom_origins:
-                self.simulator.robot_root_states[env_ids] = self.base_init_state
-                self.simulator.robot_root_states[env_ids, :3] += self.env_origins[env_ids]
-                self.simulator.robot_root_states[env_ids, :2] += torch_rand_float(-1., 1., (len(env_ids), 2), device=str(self.device)) # xy position within 1m of the center
-            else:
-                self.simulator.robot_root_states[env_ids] = self.base_init_state
-                self.simulator.robot_root_states[env_ids, :3] += self.env_origins[env_ids]
-            # base velocities
-            
-            self.simulator.robot_root_states[env_ids, 7:13] = torch_rand_float(-0.5, 0.5, (len(env_ids), 6), device=str(self.device)) # [7:10]: lin vel, [10:13]: ang vel
-
-
     def _plot_domain_rand_params(self):
         raise NotImplementedError
 
