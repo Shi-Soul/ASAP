@@ -35,6 +35,7 @@ class PPO(BaseAlgo):
         self.log_dir = log_dir
         self.writer = TensorboardSummaryWriter(log_dir=self.log_dir, flush_secs=10)
 
+        
         self.start_time = 0
         self.stop_time = 0
         self.collection_time = 0

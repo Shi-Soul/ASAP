@@ -197,6 +197,7 @@ class LeggedRobotBase(BaseTask):
         Args:
             actions (torch.Tensor): Tensor of shape (num_envs, num_actions_per_env)
         """
+        
         actions = actor_state["actions"]
         # actions *= 0.0
         self._pre_physics_step(actions)
@@ -928,3 +929,33 @@ class LeggedRobotBase(BaseTask):
     
     def _get_obs_actions(self,):
         return self.actions
+    
+    
+    # README: All DR related obs are only supported for Isaac Gym!!!!!!!!!
+    def _get_obs_dr_base_com(self,):
+        # breakpoint()
+        return self.simulator._base_com_bias
+    
+    def _get_obs_dr_link_mass(self,):
+        # breakpoint()
+        return self.simulator._link_mass_scale
+    
+    def _get_obs_dr_friction(self,):
+            # README: Only Support Isaac Gym!!!!!!!!!
+        # breakpoint()
+        return self.simulator.friction_coeffs.reshape(self.num_envs, -1)
+    
+    def _get_obs_dr_kp(self,):
+        # breakpoint()
+        return self._kp_scale
+
+    def _get_obs_dr_kd(self,):
+        # breakpoint()
+        return self._kd_scale
+    
+    def _get_obs_dr_ctrl_delay(self,):
+        # breakpoint()
+        return self.action_delay_idx.reshape(self.num_envs, -1).float()
+    
+    
+    

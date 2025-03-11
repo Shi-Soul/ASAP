@@ -211,6 +211,9 @@ class IsaacGym(BaseSimulator):
         self.base_init_state = base_init_state
         self.envs = []
         self.robot_handles = []
+        self._base_com_bias = torch.zeros(self.num_envs, 3, dtype=torch.float, device=self.device, requires_grad=False)
+        self._ground_friction_values = torch.zeros(self.num_envs, self.num_bodies, dtype=torch.float, device=self.device, requires_grad=False)
+        self._link_mass_scale = torch.ones(self.num_envs, len(self.env_config.robot.randomize_link_body_names), dtype=torch.float, device=self.device, requires_grad=False)
         with Progress() as progress:
             task = progress.add_task(
                 f"Creating {self.num_envs} environments...", total=self.num_envs
@@ -220,7 +223,7 @@ class IsaacGym(BaseSimulator):
                 env_handle = self.gym.create_env(self.sim, env_lower, env_upper, int(np.sqrt(self.num_envs)))
                 self._build_each_env(i, env_handle)
                 progress.update(task, advance=1)
-
+        self.friction_coeffs = self.friction_coeffs.to(self.device)
         return self.envs, self.robot_handles
 
     def _build_each_env(self, env_id, env_ptr):
@@ -264,7 +267,6 @@ class IsaacGym(BaseSimulator):
             [List[gymapi.RigidShapeProperties]]: Modified rigid shape properties
         """
         if self.env_config.domain_rand.randomize_friction:
-            self._ground_friction_values = torch.zeros(self.num_envs, self.num_bodies, dtype=torch.float, device=self.device, requires_grad=False)
             if env_id==0:
                 # prepare friction randomization
                 friction_range = self.env_config.domain_rand.friction_range
@@ -339,7 +341,6 @@ class IsaacGym(BaseSimulator):
 
         # randomize base com
         if self.env_config.domain_rand.randomize_base_com:
-            self._base_com_bias = torch.zeros(self.num_envs, 3, dtype=torch.float, device=self.device, requires_grad=False)
             if env_id<3:
                 logger.debug("randomizing base com")
             try:
@@ -362,7 +363,6 @@ class IsaacGym(BaseSimulator):
 
         # randomize link mass
         if self.env_config.domain_rand.randomize_link_mass:
-            self._link_mass_scale = torch.ones(self.num_envs, len(self.env_config.robot.randomize_link_body_names), dtype=torch.float, device=self.device, requires_grad=False)
             if env_id<3:
                 logger.debug("randomizing link mass")
             for i, body_name in enumerate(self.env_config.robot.randomize_link_body_names):

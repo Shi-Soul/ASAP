@@ -3,6 +3,7 @@ HYDRA_FULL_ERROR=1 python humanoidverse/eval_agent.py +checkpoint=xxx/xxxx/model
 
 # Locomotion
 
+# No DR
 python humanoidverse/train_agent.py \
 +simulator=isaacgym \
 +exp=locomotion \
@@ -22,7 +23,7 @@ experiment_name=v0CollNoDR \
 headless=True
 
 
-
+# 25.03.10
 python humanoidverse/train_agent.py \
 +simulator=isaacgym \
 +exp=locomotion \
@@ -42,6 +43,63 @@ experiment_name=v0Coll_uja0.2 \
 headless=True
 
 
+# 25.03.11
+# waist joint freeze, 
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
+        \
+        \
++domain_rand=dr_wjx_s \
++rewards=loco/reward_g1_locomotion \
++obs=loco/leggedloco_obs_history_wjx \
+        \
+        \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
+project_name=G1Loco \
+experiment_name=v0Coll_wf_drs \
+headless=True
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
+        \
+        \
++domain_rand=NO_domain_rand \
++rewards=loco/reward_g1_locomotion \
++obs=loco/leggedloco_obs_history_wjx \
+        \
+        \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
+project_name=G1Loco \
+experiment_name=v0Coll_wf_NoDR \
+headless=True
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
+        \
+        \
++domain_rand=dr_wjx_s \
++rewards=loco/reward_g1_locomotion \
++obs=loco/wjx_hist_dr \
+        \
+        \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
+project_name=G1Loco \
+experiment_name=v0Coll_wf_PrivDr \
+headless=True
 
 # Motion Tracking
 
