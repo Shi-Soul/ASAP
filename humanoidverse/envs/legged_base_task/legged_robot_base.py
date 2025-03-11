@@ -455,6 +455,24 @@ class LeggedRobotBase(BaseTask):
         if self.add_noise_currculum:
             self._update_obs_noise_curriculum()
     
+    def _episodic_domain_randomization(self, env_ids):
+        """ Update scale of Kp, Kd, rfi lim"""
+        if len(env_ids) == 0:
+            return
+        if self.config.domain_rand.randomize_pd_gain:
+            self._kp_scale[env_ids] = torch_rand_float(self.config.domain_rand.kp_range[0], self.config.domain_rand.kp_range[1], (len(env_ids), self.num_dofs), device=self.device)
+            self._kd_scale[env_ids] = torch_rand_float(self.config.domain_rand.kd_range[0], self.config.domain_rand.kd_range[1], (len(env_ids), self.num_dofs), device=self.device)
+    
+        if self.config.domain_rand.randomize_rfi_lim:
+            self._rfi_lim_scale[env_ids] = torch_rand_float(self.config.domain_rand.rfi_lim_range[0], self.config.domain_rand.rfi_lim_range[1], (len(env_ids), self.num_dofs), device=self.device)
+
+        if self.config.domain_rand.randomize_ctrl_delay:            
+            # self.action_queue[env_ids] = 0.delay:
+            self.action_queue[env_ids] *= 0.
+            # self.action_queue[env_ids] = 0.
+            self.action_delay_idx[env_ids] = torch.randint(self.config.domain_rand.ctrl_delay_step_range[0], 
+                                            self.config.domain_rand.ctrl_delay_step_range[1]+1, (len(env_ids),), device=self.device, requires_grad=False)
+
     def _update_obs_noise_curriculum(self):
         if self.average_episode_length < self.config.obs.soft_dof_pos_curriculum_level_down_threshold:
             self.current_noise_curriculum_value *= (1 - self.config.obs.soft_dof_pos_curriculum_degree)
@@ -838,24 +856,6 @@ class LeggedRobotBase(BaseTask):
         # Penalize collisions on selected bodies
         return torch.sum(1.*(torch.norm(self.simulator.contact_forces[:, self.penalised_contact_indices, :], dim=-1) > 0.1), dim=1)
     
-    def _episodic_domain_randomization(self, env_ids):
-        """ Update scale of Kp, Kd, rfi lim"""
-        if len(env_ids) == 0:
-            return
-        if self.config.domain_rand.randomize_pd_gain:
-            self._kp_scale[env_ids] = torch_rand_float(self.config.domain_rand.kp_range[0], self.config.domain_rand.kp_range[1], (len(env_ids), self.num_dofs), device=self.device)
-            self._kd_scale[env_ids] = torch_rand_float(self.config.domain_rand.kd_range[0], self.config.domain_rand.kd_range[1], (len(env_ids), self.num_dofs), device=self.device)
-    
-        if self.config.domain_rand.randomize_rfi_lim:
-            self._rfi_lim_scale[env_ids] = torch_rand_float(self.config.domain_rand.rfi_lim_range[0], self.config.domain_rand.rfi_lim_range[1], (len(env_ids), self.num_dofs), device=self.device)
-
-        if self.config.domain_rand.randomize_ctrl_delay:            
-            # self.action_queue[env_ids] = 0.delay:
-            self.action_queue[env_ids] *= 0.
-            # self.action_queue[env_ids] = 0.
-            self.action_delay_idx[env_ids] = torch.randint(self.config.domain_rand.ctrl_delay_step_range[0], 
-                                            self.config.domain_rand.ctrl_delay_step_range[1]+1, (len(env_ids),), device=self.device, requires_grad=False)
-
 
     def _push_robots(self, env_ids):
         """ Random pushes the robots. Emulates an impulse by setting a randomized base velocity. 
