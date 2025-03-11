@@ -213,6 +213,7 @@ class IsaacGym(BaseSimulator):
         self.robot_handles = []
         self._base_com_bias = torch.zeros(self.num_envs, 3, dtype=torch.float, device=self.device, requires_grad=False)
         self._ground_friction_values = torch.zeros(self.num_envs, self.num_bodies, dtype=torch.float, device=self.device, requires_grad=False)
+        self.friction_coeffs = torch.ones(self.num_envs, 1, 1, dtype=torch.float, device=self.device, requires_grad=False)
         self._link_mass_scale = torch.ones(self.num_envs, len(self.env_config.robot.randomize_link_body_names), dtype=torch.float, device=self.device, requires_grad=False)
         with Progress() as progress:
             task = progress.add_task(

@@ -52,6 +52,7 @@ def listen_for_keypress(env):
 # from humanoidverse.envs.base_task.omnih2o_cfg import OmniH2OCfg
 
 @hydra.main(config_path="config", config_name="base_eval")
+
 def main(override_config: OmegaConf):
     # logging to hydra log file
     hydra_log_path = os.path.join(HydraConfig.get().runtime.output_dir, "eval.log")
