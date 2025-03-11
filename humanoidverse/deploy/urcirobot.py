@@ -34,9 +34,11 @@ class URCIRobot:
     _obs_cfg_obs: Optional[OmegaConf]=None
     _ref_pid = 0 # reference policy id
     
+    # TODO: merging __init__ for both Mujoco and Real, sharing more code
     def __init__(self, cfg: OmegaConf):
         self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
     
+    # TODO: add a bottom for Reset and continue running
     def routing(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
         self._check_init()
         cur_pid = -1
@@ -114,6 +116,7 @@ class URCIRobot:
     def GetState(self):
         raise NotImplementedError("Not implemented")
     
+    # TODO: Decompose UpdateObs into two parts: 1) UpdateObsWoHistory, 2) UpdateObsWithHistory
     def UpdateObsWoHistory(self):
         self.GetState()
         
@@ -180,6 +183,7 @@ class URCIRobot:
         for key in self.history_handler.history.keys():
             self.history_handler.add(key, self.hist_obs_dict[key])
     
+    # TODO: better _check_init
     def _check_init(self):
         assert self.dt is not None, "dt is not set"
         assert self.dt>0 and self.dt < 0.1, "dt is not in the valid range"
@@ -229,7 +233,6 @@ class URCIRobot:
                     logger.debug(f"PD gain of joint {name} were defined, setting them to {self.kp[i]} and {self.kd[i]}")
             if not found:
                 raise ValueError(f"PD gain of joint {name} were not defined. Should be defined in the yaml file.")
-        
         
     def _make_buffer(self):
         
