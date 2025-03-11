@@ -131,6 +131,7 @@ class MujocoRobot(URCIRobot):
             self.is_render = True
             self.__make_viewer()
 
+    # TODO: visualize the motion keypoint in MujocoViewer
     def __make_viewer(self):
         ...
         self.viewer = mujoco_viewer.MujocoViewer(self.model, self.data)

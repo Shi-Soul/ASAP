@@ -45,7 +45,7 @@ class URCIRobot:
         
         while True:
             t1 = time.time()
-            
+            # TODO: auto change policy when a motion tracking is done
             
             if cur_pid != self._ref_pid:
                 self._ref_pid %= len(cfg_policies)
@@ -72,6 +72,8 @@ class URCIRobot:
             t2 = time.time()
             
             if self.REAL:
+            # if True:
+            #     print(f"t2-t1 = {t2-t1}")
                 remain_dt = self.dt - (t2-t1)
                 if remain_dt > 0:
                     time.sleep(remain_dt)
@@ -95,6 +97,8 @@ class URCIRobot:
             t2 = time.time()
             
             if self.REAL:
+            # if True:
+            #     print(f"t2-t1 = {t2-t1}")
                 remain_dt = self.dt - (t2-t1)
                 if remain_dt > 0:
                     time.sleep(remain_dt)
@@ -298,7 +302,7 @@ class URCIRobot:
     
     
     def _get_obs_ref_motion_phase(self):
-        logger.info(f"Phase: {self.ref_motion_phase}")
+        # logger.info(f"Phase: {self.ref_motion_phase}")
         return torch.tensor(self.ref_motion_phase).reshape(1,)
     
     def _get_obs_dif_local_rigid_body_pos(self):
