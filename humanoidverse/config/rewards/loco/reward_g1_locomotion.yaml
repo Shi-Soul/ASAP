@@ -5,7 +5,7 @@
 
 rewards:
   set_reward: Weiji
-  set_reward_date: 20250310
+  set_reward_date: 20250311
   only_positive_rewards: False
   reward_scales:
       tracking_lin_vel: 1.0
@@ -31,6 +31,8 @@ rewards:
       # penalty_in_the_air: -100.0
       # feet_max_height_for_this_air: -100.0
       upperbody_joint_angle_freeze: -0.2
+      waist_joint_angle_freeze: -0.5
+
       feet_heading_alignment: -0.3
       penalty_close_feet_xy: -10.
       penalty_ang_vel_xy_torso: -1.0

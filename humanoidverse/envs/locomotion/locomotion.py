@@ -252,6 +252,11 @@ class LeggedRobotLocomotion(LeggedRobotBase):
         return (self.knee_distance_xy < self.config.rewards.close_knees_threshold)* 1.0
     
 
+    def _reward_waist_joint_angle_freeze(self):
+        # returns keep the waist joint angles close to the default
+        deviation = torch.abs(self.simulator.dof_pos[:, self.waist_dof_indices] - self.default_dof_pos[:,self.waist_dof_indices])
+        return torch.sum(deviation, dim=1)
+    
     def _reward_upperbody_joint_angle_freeze(self):
         # returns keep the upper body joint angles close to the default
         assert self.config.robot.has_upper_body_dof
