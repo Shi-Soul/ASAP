@@ -646,32 +646,40 @@ class LeggedRobotBase(BaseTask):
         """
         Update the reward limits curriculum based on the average episode length.
         """
+        curriculum_cfg = self.config.rewards.reward_limit.reward_limits_curriculum
+        
         if self.use_reward_limits_dof_pos_curriculum:
-            if self.average_episode_length < self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_pos_curriculum_level_down_threshold:
-                self.soft_dof_pos_curriculum_value *= (1 + self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_pos_curriculum_degree)
-            elif self.average_episode_length > self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_pos_curriculum_level_up_threshold:
-                self.soft_dof_pos_curriculum_value *= (1 - self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_pos_curriculum_degree)
-            self.soft_dof_pos_curriculum_value = np.clip(self.soft_dof_pos_curriculum_value, 
-                                                         self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_pos_min_limit, 
-                                                         self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_pos_max_limit)
+            if self.average_episode_length < curriculum_cfg.soft_dof_pos_curriculum_level_down_threshold:
+                self.soft_dof_pos_curriculum_value *= (1 + curriculum_cfg.soft_dof_pos_curriculum_degree)
+            elif self.average_episode_length > curriculum_cfg.soft_dof_pos_curriculum_level_up_threshold:
+                self.soft_dof_pos_curriculum_value *= (1 - curriculum_cfg.soft_dof_pos_curriculum_degree)
+            self.soft_dof_pos_curriculum_value = np.clip(
+                self.soft_dof_pos_curriculum_value,
+                curriculum_cfg.soft_dof_pos_min_limit,
+                curriculum_cfg.soft_dof_pos_max_limit
+            )
         
         if self.use_reward_limits_dof_vel_curriculum:
-            if self.average_episode_length < self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_vel_curriculum_level_down_threshold:
-                self.soft_dof_vel_curriculum_value *= (1 + self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_vel_curriculum_degree)
-            elif self.average_episode_length > self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_vel_curriculum_level_up_threshold:
-                self.soft_dof_vel_curriculum_value *= (1 - self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_vel_curriculum_degree)
-            self.soft_dof_vel_curriculum_value = np.clip(self.soft_dof_vel_curriculum_value, 
-                                                         self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_vel_min_limit, 
-                                                         self.config.rewards.reward_limit.reward_limits_curriculum.soft_dof_vel_max_limit)
+            if self.average_episode_length < curriculum_cfg.soft_dof_vel_curriculum_level_down_threshold:
+                self.soft_dof_vel_curriculum_value *= (1 + curriculum_cfg.soft_dof_vel_curriculum_degree)
+            elif self.average_episode_length > curriculum_cfg.soft_dof_vel_curriculum_level_up_threshold:
+                self.soft_dof_vel_curriculum_value *= (1 - curriculum_cfg.soft_dof_vel_curriculum_degree)
+            self.soft_dof_vel_curriculum_value = np.clip(
+                self.soft_dof_vel_curriculum_value,
+                curriculum_cfg.soft_dof_vel_min_limit,
+                curriculum_cfg.soft_dof_vel_max_limit
+            )
         
         if self.use_reward_limits_torque_curriculum:
-            if self.average_episode_length < self.config.rewards.reward_limit.reward_limits_curriculum.soft_torque_curriculum_level_down_threshold:
-                self.soft_torque_curriculum_value *= (1 + self.config.rewards.reward_limit.reward_limits_curriculum.soft_torque_curriculum_degree)
-            elif self.average_episode_length > self.config.rewards.reward_limit.reward_limits_curriculum.soft_torque_curriculum_level_up_threshold:
-                self.soft_torque_curriculum_value *= (1 - self.config.rewards.reward_limit.reward_limits_curriculum.soft_torque_curriculum_degree)
-            self.soft_torque_curriculum_value = np.clip(self.soft_torque_curriculum_value, 
-                                                        self.config.rewards.reward_limit.reward_limits_curriculum.soft_torque_min_limit, 
-                                                        self.config.rewards.reward_limit.reward_limits_curriculum.soft_torque_max_limit)
+            if self.average_episode_length < curriculum_cfg.soft_torque_curriculum_level_down_threshold:
+                self.soft_torque_curriculum_value *= (1 + curriculum_cfg.soft_torque_curriculum_degree)
+            elif self.average_episode_length > curriculum_cfg.soft_torque_curriculum_level_up_threshold:
+                self.soft_torque_curriculum_value *= (1 - curriculum_cfg.soft_torque_curriculum_degree)
+            self.soft_torque_curriculum_value = np.clip(
+                self.soft_torque_curriculum_value,
+                curriculum_cfg.soft_torque_min_limit,
+                curriculum_cfg.soft_torque_max_limit
+            )
 
     #------------ reward functions----------------
     ########################### PENALTY REWARDS ###########################
