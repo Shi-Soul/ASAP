@@ -324,7 +324,7 @@ class LeggedRobotBase(BaseTask):
         
         for key in self.log_dict.keys():
             if key.startswith("terminate_by_"):
-                self.log_dict[key] = self.log_dict[key] / (self.reset_buf.float().mean() + 1e-9)
+                self.log_dict[key] = self.log_dict[key] / (self.reset_buf.float().mean() + 1e-15)
 
     def _update_reset_buf(self):
         self.reset_buf_terminate_by = {
