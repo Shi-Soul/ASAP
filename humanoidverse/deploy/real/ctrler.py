@@ -332,9 +332,19 @@ class RealRobot(URCIRobot, LowLevelMagic):
             
     
     def LowStateCallback(self):
-        
+        """
+            B: low level Quick Stop
+            X: high level Reset
+            
+            lx,ly: velocity command
+            rx: yaw directino command
+        """
         # handle joystick keyboard
         LowLevelMagic.LowStateCallback(self)
+            
+        
+        if self.joystick.button[KeyMap.X] == 1: # quick stop
+            self._ref_pid = -2
             
         pass
             
