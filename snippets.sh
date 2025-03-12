@@ -6,7 +6,7 @@ HYDRA_FULL_ERROR=1 python humanoidverse/eval_agent.py +checkpoint=xxx/xxxx/model
 
 
 
-
+# Debug Run
 python humanoidverse/train_agent.py \
 +simulator=isaacgym \
 +exp=locomotion \
@@ -20,7 +20,7 @@ python humanoidverse/train_agent.py \
 robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
 num_envs=128 \
 +device=cuda:0 \
-project_name=G1Loco \
+project_name=DebugLocomotion \
 experiment_name=Debug \
 headless=True
 

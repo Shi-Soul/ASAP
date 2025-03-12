@@ -22,7 +22,11 @@ from rich.panel import Panel
 from rich.live import Live
 console = Console()
 
+
+from wjxtools import pdb_decorator
+
 class PPO(BaseAlgo):
+    @pdb_decorator
     def __init__(self,
                  env: BaseTask,
                  config,
@@ -471,7 +475,7 @@ class PPO(BaseAlgo):
             "critic": self.critic
         }
 
-    def _post_epoch_logging(self, log_dict, width=80, pad=35, report_frequency=1):
+    def _post_epoch_logging(self, log_dict, width=80, pad=40, report_frequency=1):
         # Update total timesteps and total time
         self.tot_timesteps += self.num_steps_per_env * self.env.num_envs
         self.tot_time += log_dict['collection_time'] + log_dict['learn_time']
@@ -485,15 +489,15 @@ class PPO(BaseAlgo):
             str = f" \033[1m Learning iteration {log_dict['it']}/{self.current_learning_iteration + log_dict['num_learning_iterations']} \033[0m "
             
             return (f"""{str.center(width, ' ')}\n\n"""
-                    f"""{'Computation:':>{pad}} {fps:.0f} steps/s (Collection: {log_dict['collection_time']:.3f}s, Learning {log_dict['learn_time']:.3f}s)\n"""
-                    f"""{'Mean action noise std:':>{pad}} {mean_std:.2f}\n""")
+                    f"""{'Computation:':>{pad}} {fps:.0f} steps/s\n"""
+                    f"""{'Mean action noise std:':>{pad}} {mean_std:>10.4f}\n""")
 
         def generate_reward_length_log():
             # Generate log for mean reward and mean episode length
             reward_length_string = ""
             if len(log_dict['rewbuffer']) > 0:
-                reward_length_string += (f"""{'Mean reward:':>{pad}} {statistics.mean(log_dict['rewbuffer']):.2f}\n"""
-                                         f"""{'Mean episode length:':>{pad}} {statistics.mean(log_dict['lenbuffer']):.2f}\n""")
+                reward_length_string += (f"""{'Mean reward:':>{pad}} {statistics.mean(log_dict['rewbuffer']):>10.4f}\n"""
+                                         f"""{'Mean episode length:':>{pad}} {statistics.mean(log_dict['lenbuffer']):>10.4f}\n""")
             return reward_length_string
 
         def generate_env_log():
@@ -503,13 +507,13 @@ class PPO(BaseAlgo):
             env_log_dict = {f"Env/{k}": v for k, v in env_log_dict.items()}
             
             for k, v in env_log_dict.items():
-                entry = f"{f'{k}:':>{pad}} {v:.4f}"
+                entry = f"{f'{k}:':>{pad}} {v:>10.4f}"
                 env_log_string += f"{entry}\n"
             return env_log_string
 
         def generate_episode_log():
             # Generate log for episode information
-            ep_string = f''
+            ep_string = f"{'-' * width}\n"  # Add a separator line before episode info
             if log_dict['ep_infos']:
                 for key in log_dict['ep_infos'][0]:
                     infotensor = torch.tensor([], device=self.device)
@@ -522,17 +526,19 @@ class PPO(BaseAlgo):
                         infotensor = torch.cat((infotensor, ep_info[key].to(self.device)))
                     value = torch.mean(infotensor)
                     self.writer.add_scalar('Episode/' + key, value, log_dict['it'])
-                    ep_string += f"""{f'{key}:':>{pad}} {value:.4f}\n"""  # Removed "Mean episode" prefix
+                    ep_string += f"""{f'{key}:':>{pad}} {value:>10.4f}\n"""  # Removed "Mean episode" prefix
             return ep_string
 
         def generate_total_time_log():
             # Calculate ETA and generate total time log
             eta = self.tot_time / (log_dict['it'] + 1) * (log_dict['num_learning_iterations'] - log_dict['it'])
-            return (f"""{'-' * 80}\n"""
-                    f"""{'Total timesteps:':>35} {self.tot_timesteps}\n"""
-                    f"""{'Iteration time:':>35} {iteration_time:.2f}s\n"""
-                    f"""{'Total time:':>35} {self.tot_time:.2f}s\n"""
-                    f"""{'ETA:':>35} {eta:.1f}s\n""")
+            return (f"""{'-' * width}\n"""
+                    f"""{'Total timesteps:':>{pad}} {self.tot_timesteps:.0f}\n"""  # Integer without decimal
+                    f"""{'Collection time:':>{pad}} {log_dict['collection_time']:>10.4f}s\n"""  # Four decimal places
+                    f"""{'Learning time:':>{pad}} {log_dict['learn_time']:>10.4f}s\n"""  # Four decimal places
+                    f"""{'Iteration time:':>{pad}} {iteration_time:>10.4f}s\n"""  # Four decimal places
+                    f"""{'Total time:':>{pad}} {self.tot_time:>10.4f}s\n"""  # Four decimal places
+                    f"""{'ETA:':>{pad}} {eta:>10.4f}s\n""")  # Four decimal places
 
         # Generate all log strings
         log_string = (generate_computation_log() +
