@@ -142,7 +142,7 @@ class LeggedRobotLocomotion(LeggedRobotBase):
         is_zerocmd = torch.norm(self.commands[:, :3], dim=1) < 0.1
         
         error = torch.sum(torch.square(self.simulator.dof_pos - self.default_dof_pos), dim=1)
-        return torch.exp(-error*is_zerocmd.float()/self.config.rewards.reward_tracking_sigma.standstill)
+        return torch.exp(-error*is_zerocmd.float()/self.config.rewards.reward_tracking_sigma.standstill)-1
 
     def _reward_tracking_lin_vel(self):
         # Tracking of linear velocity commands (xy axes)
