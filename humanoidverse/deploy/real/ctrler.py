@@ -9,6 +9,7 @@ from typing import Union, List
 import numpy as np
 import time
 import torch
+import signal
 
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelFactoryInitialize # type: ignore
 from unitree_sdk2py.core.channel import ChannelSubscriber, ChannelFactoryInitialize # type: ignore
@@ -45,6 +46,12 @@ class LowLevelMagic:
     
     
     def __init__(self, cfg: OmegaConf):
+        
+        def signal_handler(sig, frame):
+            logger.info("Ctrl+C  Exiting safely...")
+            self.safe_exit()
+        signal.signal(signal.SIGINT, signal_handler)
+        
         config = cfg.deploy
         self.joystick = RemoteController()
         ChannelFactoryInitialize(0, config.net)
@@ -81,7 +88,7 @@ class LowLevelMagic:
             raise ValueError("Invalid msg_type")
 
         # wait for the subscriber to receive data
-        self._wait()
+        # self._wait() #DEBUG:
 
         # Initialize the command msg
         if config.msg_type == "hg":
@@ -90,7 +97,7 @@ class LowLevelMagic:
             init_cmd_go(self.low_cmd, weak_motor=config.weak_motor)
             
     def safe_exit(self):
-        logger.info("Exiting...")
+        logger.info("Real Robot Exiting...")
         os._exit(1)
         
     def sanity_check(self):
@@ -342,6 +349,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
             create_zero_cmd(self.low_cmd)
             self.send_cmd()
             time.sleep(self.dt)
+            breakpoint()
     
     def ToDefaultPose(self):
         logger.info("Moving to default pos.")
