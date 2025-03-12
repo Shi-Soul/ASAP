@@ -37,6 +37,7 @@ env:
       # termination_max_base_ang_vel : 5.0
       termination_gravity_x : 0.8
       termination_gravity_y : 0.8
+      termination_gravity : 0.75
       
     termination_probality:
       terminate_when_close_to_dof_pos_limit: 0.25

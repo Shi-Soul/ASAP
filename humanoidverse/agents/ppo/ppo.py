@@ -523,7 +523,7 @@ class PPO(BaseAlgo):
             for k, v in env_log_dict.items():
                 entry = f"{f'{k}:':>{pad}} {v:>10.4f}"
                 env_log_string += f"{entry}\n"
-                self.writer.add_scalar(k, v, log_dict['it'])
+                self.writer.add_scalar('Env/'+k, v, log_dict['it'])
                 
                 
             for loss_key, loss_value in log_dict['loss_dict'].items():
