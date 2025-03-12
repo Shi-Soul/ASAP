@@ -62,8 +62,9 @@ class URCIRobot:
     # TODO: add a bottom for Reset and continue running
     def routing(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
         self._check_init()
+        self.cmd[3]=self.rpy[2]
         cur_pid = -1
-        
+
         while True:
             t1 = time.time()
             # TODO: auto change policy when a motion tracking is done
@@ -76,7 +77,6 @@ class URCIRobot:
                 policy_fn = cfg_policies[cur_pid][1]
                 
                 # TODO: cleaning state, history about 'ref_motion_phase'
-                self._subtimer=0
                 self.timer=0 # TODO unify it.
                 self.history_handler.history['ref_motion_phase']*=0
                 
@@ -105,7 +105,8 @@ class URCIRobot:
     
     def looping(self, policy_fn):
         self._check_init()
-        
+        self.cmd[3]=self.rpy[2]
+
         while True:
             t1 = time.time()
             

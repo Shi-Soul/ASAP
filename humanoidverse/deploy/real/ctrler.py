@@ -297,6 +297,11 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.cmd[2] = np.clip(0.5*wrap_to_pi_float(self.cmd[3] - self.rpy[2]), -1., 1.)
         else:
             self.cmd[2] = self.joystick.rx * -1 * 0.3
+            
+        if self.is_motion_tracking:
+            self.motion_time = (self.timer) * self.dt 
+            self.ref_motion_phase = self.motion_time / self.motion_len
+            
         breakpoint() # check the syntax of self.cmd
         
         
@@ -315,6 +320,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.UpdateObs()
     
     def ApplyAction(self, action:np.ndarray):
+        self.timer+=1
         self.act = action.copy()
         target_q = np.clip(action, -self.clip_action_limit, self.clip_action_limit) * self.action_scale + self.dof_init_pose
         

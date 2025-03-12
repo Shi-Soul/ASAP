@@ -92,7 +92,7 @@ class MujocoRobot(URCIRobot):
         self.decimation = cfg.simulator.config.sim.control_decimation
         self.sim_dt = 1/cfg.simulator.config.sim.fps
         assert self.dt == self.decimation * self.sim_dt
-        self._subtimer = 0
+        # self._subtimer = 0
         
         
         
@@ -172,8 +172,9 @@ class MujocoRobot(URCIRobot):
         
         self.act[:] = 0
         self.history_handler.reset([0])
-
-        self._subtimer = 0
+        self.timer: int = 0
+        
+        # self._subtimer = 0
         
         self.UpdateObs()
         ...
@@ -210,13 +211,14 @@ class MujocoRobot(URCIRobot):
             self.cmd[2] = np.clip(0.5*wrap_to_pi_float(self.cmd[3] - self.rpy[2]), -1., 1.)
             
         if self.is_motion_tracking:
-            self.motion_time = (self._subtimer/self.decimation) * self.dt 
+            self.motion_time = (self.timer) * self.dt 
             self.ref_motion_phase = self.motion_time / self.motion_len
             
         # breakpoint()
     
         
     def ApplyAction(self, action): 
+        self.timer+=1
         if self.RAND_NOISE: action = MujocoRobot.mk_rand_noise(action, MujocoRobot.noise_ratio)
         
         self.act = action.copy()
@@ -269,7 +271,7 @@ class MujocoRobot(URCIRobot):
                     self.viewer.render()
                 else:
                     raise Exception("Mujoco Robot Exit")
-            self._subtimer += 1
+            # self._subtimer += 1
         
         self.UpdateObs()
 
