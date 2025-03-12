@@ -37,6 +37,34 @@ import os
 from ..urcirobot import URCIRobot
 np2torch = lambda x: torch.tensor(x, dtype=torch.float32)
 torch2np = lambda x: x.cpu().numpy()
+def wrap_to_pi_float(angles:float):
+    angles %= 2*np.pi
+    angles -= 2*np.pi * (angles > np.pi)
+    return angles
+
+def quaternion_to_euler_array(quat):
+    # Ensure quaternion is in the correct format [x, y, z, w]
+    x, y, z, w = quat
+    
+    # Roll (x-axis rotation)
+    t0 = +2.0 * (w * x + y * z)
+    t1 = +1.0 - 2.0 * (x * x + y * y)
+    roll_x = np.arctan2(t0, t1)
+    
+    # Pitch (y-axis rotation)
+    t2 = +2.0 * (w * y - z * x)
+    t2 = np.clip(t2, -1.0, 1.0)
+    pitch_y = np.arcsin(t2)
+    
+    # Yaw (z-axis rotation)
+    t3 = +2.0 * (w * z + x * y)
+    t4 = +1.0 - 2.0 * (y * y + z * z)
+    yaw_z = np.arctan2(t3, t4)
+    
+    # Returns roll, pitch, yaw in a NumPy array in radians
+    return np.array([roll_x, pitch_y, yaw_z])
+
+
 
 
 class LowLevelMagic:
@@ -211,6 +239,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.cmd: np.ndarray = np.array(cfg.deploy.defcmd)
         assert self.num_real_dofs == 29, "Only 29 dofs are supported for now"
         
+        self.heading_cmd = cfg.deploy.heading_cmd   
         self.clip_action_limit: float = cfg.robot.control.action_clip_value
         self.clip_observations: float = cfg.env.config.normalization.clip_observations
         self.action_scale: float = cfg.robot.control.action_scale
@@ -246,10 +275,13 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.kp_real = np.zeros(self.num_real_dofs)
         self.kd_real = np.zeros(self.num_real_dofs)
         
+        self.dof_init_pose_real = np.zeros(self.num_real_dofs)
+        
         # 填充有效关节的kp/kd
         for i, j in enumerate(self.dof_idx_23_to_29):
             self.kp_real[j] = self.kp[i]
             self.kd_real[j] = self.kd[i]
+            self.dof_init_pose_real[j] = self.dof_init_pose[i]
             
         # 填充锁定关节的kp/kd
         for j in self.dof_idx_locked:
@@ -350,50 +382,46 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.send_cmd()
             time.sleep(self.dt)
     
-    def ToDefaultPose(self):
-        logger.info("Moving to default pos.")
-        total_time: float = 2
-        num_step = int(total_time / self.dt)
+    ToDefaultPose = lambda self: self.MoveToPose29Dof(self.dof_init_pose_real, 2.0)
+    KeepDefaultPose = lambda self: self.KeepPose29Dof(self.dof_init_pose_real)
+
+
+    def MoveToPose29Dof(self, target_pose: np.ndarray, duration: float):
+        logger.info("Moving to specified pose.")
+        num_step = int(duration / self.dt)
         
-        start_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
-        end_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)# 锁定关节位置设为0
+        self.GetState()
+        start_dof_pos = self.q_real.copy()
+        end_dof_pos = target_pose.copy()  # Use the provided target pose
         
-        for i, j in enumerate(self.dof_idx_23_to_29):
-            end_dof_pos[j] = self.dof_init_pose[i]
-            
-        # 移动到默认姿态
+        # Move to the specified pose
         for i in range(num_step + 1):
             alpha = i / num_step
             for j in range(self.num_real_dofs):
                 self.low_cmd.motor_cmd[j].q = start_dof_pos[j] * (1 - alpha) + end_dof_pos[j] * alpha
                 self.low_cmd.motor_cmd[j].qd = 0
-                self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 直接使用预计算值
-                self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 直接使用预计算值
-                self.low_cmd.motor_cmd[j].tau = 0
-            self.send_cmd()
-            time.sleep(self.dt)
-            
-    def KeepDefaultPose(self):
-        logger.info("Enter default pos state.")
-        logger.info("Waiting for the Button A signal...")
-        
-        end_dof_pos = np.zeros(self.num_real_dofs, dtype=np.float32)
-        
-        # 初始化目标位置
-        for i, j in enumerate(self.dof_idx_23_to_29):
-            end_dof_pos[j] = self.dof_init_pose[i]
-            
-        # 保持默认姿态
-        while self.joystick.button[KeyMap.A] != 1:
-            for j in range(self.num_real_dofs):
-                self.low_cmd.motor_cmd[j].q = end_dof_pos[j]
-                self.low_cmd.motor_cmd[j].qd = 0
-                self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # 直接使用预计算值
-                self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # 直接使用预计算值
+                self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # Use pre-calculated values
+                self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # Use pre-calculated values
                 self.low_cmd.motor_cmd[j].tau = 0
             self.send_cmd()
             time.sleep(self.dt)
 
+    def KeepPose29Dof(self, pose: np.ndarray):
+        logger.info("Entering pose hold state.")
+        logger.info("Waiting for the Button A signal...")
+        
+        # Maintain the current pose
+        current_pose = pose.copy()
+        
+        while self.joystick.button[KeyMap.A] != 1:
+            for j in range(self.num_real_dofs):
+                self.low_cmd.motor_cmd[j].q = current_pose[j]
+                self.low_cmd.motor_cmd[j].qd = 0
+                self.low_cmd.motor_cmd[j].kp = self.kp_real[j]  # Use pre-calculated values
+                self.low_cmd.motor_cmd[j].kd = self.kd_real[j]  # Use pre-calculated values
+                self.low_cmd.motor_cmd[j].tau = 0
+            self.send_cmd()
+            time.sleep(self.dt)
 
 
 
