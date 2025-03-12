@@ -230,19 +230,10 @@ class RealRobot(URCIRobot, LowLevelMagic):
         LowLevelMagic.__init__(self, cfg)
         
         
-        self.cfg: OmegaConf = cfg
-        self.device: str = "cpu"
-        self.dt: float = cfg.deploy.ctrl_dt
-        self.timer: int = 0
         
         self.num_real_dofs: int = 29
-        self.cmd: np.ndarray = np.array(cfg.deploy.defcmd)
         assert self.num_real_dofs == 29, "Only 29 dofs are supported for now"
         
-        self.heading_cmd = cfg.deploy.heading_cmd   
-        self.clip_action_limit: float = cfg.robot.control.action_clip_value
-        self.clip_observations: float = cfg.env.config.normalization.clip_observations
-        self.action_scale: float = cfg.robot.control.action_scale
         self.dof_idx_23_to_29: List[int] = cfg.deploy.dof_idx_23_to_29
         self.dof_idx_locked: List[int] = [i for i in range(0, 29) if i not in self.dof_idx_23_to_29]
         self.locked_kp: float = cfg.deploy.locked_kp
@@ -251,16 +242,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
         logger.info("Initializing **Real** Robot")
         logger.info("Task Name: {}".format(cfg.log_task_name))
         logger.info("Robot Type: {}".format(cfg.robot.asset.robot_type))
-        
-        self._make_init_pose()
-        self._make_buffer()
-        if cfg.log_task_name == "motion_tracking":
-            self.is_motion_tracking: bool = True
-            self._make_motionlib()
-        else:
-            self.is_motion_tracking: bool = False
-        
-        super().__init__(cfg)
         
         self.Reset()
     
@@ -324,7 +305,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
     
     def Reset(self):
         self.ToZeroTorque()
-        self.ToDefaultPose()
+        self.MoveToDefaultPose()
         self.KeepDefaultPose()
         
         self.act[:] = 0
@@ -382,9 +363,8 @@ class RealRobot(URCIRobot, LowLevelMagic):
             self.send_cmd()
             time.sleep(self.dt)
     
-    ToDefaultPose = lambda self: self.MoveToPose29Dof(self.dof_init_pose_real, 2.0)
+    MoveToDefaultPose = lambda self: self.MoveToPose29Dof(self.dof_init_pose_real, 2.0)
     KeepDefaultPose = lambda self: self.KeepPose29Dof(self.dof_init_pose_real)
-
 
     def MoveToPose29Dof(self, target_pose: np.ndarray, duration: float):
         logger.info("Moving to specified pose.")

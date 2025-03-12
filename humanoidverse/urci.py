@@ -88,27 +88,22 @@ class MujocoRobot(URCIRobot):
     
     def __init__(self, cfg):
         super().__init__(cfg)
-        self.cfg:OmegaConf = cfg
-        self.device="cpu"
         
         self.decimation = cfg.simulator.config.sim.control_decimation
         self.sim_dt = 1/cfg.simulator.config.sim.fps
-        self.dt = self.decimation * self.sim_dt
+        assert self.dt == self.decimation * self.sim_dt
         self._subtimer = 0
         
-        self.clip_action_limit = cfg.robot.control.action_clip_value
-        self.clip_observations = cfg.env.config.normalization.clip_observations
-        self.action_scale = cfg.robot.control.action_scale
         
         
         self.model = mujoco.MjModel.from_xml_path(os.path.join(cfg.robot.asset.asset_root, cfg.robot.asset.xml_file)) # type: ignore
         # self.model = mujoco.MjModel.from_xml_path('/home/bai/ASAP/humanoidverse/data/robots/g1/g1_23dof_lock_wrist_phys.xml')
         self.data = mujoco.MjData(self.model) # type: ignore
         self.model.opt.timestep = self.sim_dt
+        if cfg.deploy.render:
+            self.is_render = True
+            self.__make_viewer()
         
-        self.heading_cmd = cfg.deploy.heading_cmd   
-        self.cmd = np.array(cfg.deploy.defcmd)
-        self.num_actions = cfg.robot.actions_dim
         self.num_ctrl = self.data.ctrl.shape[0]
         assert self.num_ctrl == self.num_actions, f"Number of control DOFs {self.num_ctrl} does not match number of actions {self.num_actions}"
         
@@ -116,20 +111,10 @@ class MujocoRobot(URCIRobot):
         logger.info("Task Name: {}".format(cfg.log_task_name))
         logger.info("Robot Type: {}".format(cfg.robot.asset.robot_type))
         
-        self._make_init_pose()
-        self._make_buffer()
-        if cfg.log_task_name == "motion_tracking":
-            self.is_motion_tracking = True
-            self._make_motionlib()
-        else:
-            self.is_motion_tracking = False
         
         self.Reset()
         
         mujoco.mj_step(self.model, self.data) # type: ignore    
-        if cfg.deploy.render:
-            self.is_render = True
-            self.__make_viewer()
 
     # TODO: visualize the motion keypoint in MujocoViewer
     def __make_viewer(self):

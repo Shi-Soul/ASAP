@@ -37,6 +37,27 @@ class URCIRobot:
     # TODO: merging __init__ for both Mujoco and Real, sharing more code
     def __init__(self, cfg: OmegaConf):
         self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
+        
+        self.cfg: OmegaConf = cfg
+        self.device: str = "cpu"
+        self.dt: float = cfg.deploy.ctrl_dt
+        self.timer: int = 0
+        
+        
+        self.num_actions = cfg.robot.actions_dim
+        self.heading_cmd = cfg.deploy.heading_cmd   
+        self.clip_action_limit: float = cfg.robot.control.action_clip_value
+        self.clip_observations: float = cfg.env.config.normalization.clip_observations
+        self.action_scale: float = cfg.robot.control.action_scale
+        
+        self._make_init_pose()
+        self._make_buffer()
+        if cfg.log_task_name == "motion_tracking":
+            self.is_motion_tracking = True
+            self._make_motionlib()
+        else:
+            self.is_motion_tracking = False
+        
     
     # TODO: add a bottom for Reset and continue running
     def routing(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
@@ -239,6 +260,7 @@ class URCIRobot:
                 raise ValueError(f"PD gain of joint {name} were not defined. Should be defined in the yaml file.")
         
     def _make_buffer(self):
+        self.cmd: np.ndarray = np.array(self.cfg.deploy.defcmd)
         
         self.q = np.zeros(self.num_dofs)
         self.dq = np.zeros(self.num_dofs)
