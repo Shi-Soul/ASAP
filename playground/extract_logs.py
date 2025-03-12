@@ -140,7 +140,7 @@ def main(n_days, max_id, output_dir):
             
             if target_file in files:
                 if len(src_event) > 0:
-                    trg_event_file_path = os.path.join(bbb_output_path, src_event[0])
+                    trg_event_file_path = os.path.join(bbb_output_path, os.path.basename(src_event[0]))
                     print(f"Copying event file from {src_event[0]} to {trg_event_file_path}")
                     shutil.copy(src_event[0], trg_event_file_path)
                 
