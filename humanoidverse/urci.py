@@ -604,8 +604,8 @@ def main(override_config: OmegaConf):
     pre_process_config(config)
     # device = config.get("device", "cuda:0" if torch.cuda.is_available() else "cpu")
     
+    assert RobotCls.REAL==REAL, f" {RobotCls.REAL=} is not equal to {REAL=}!!! Please manually set the REAL flag in the header."
     robot:URCIRobot = RobotCls(config)
-    assert robot.REAL==REAL, f" {robot.REAL=} is not equal to {REAL=}!!! Please manually set the REAL flag in the header."
     
     if deploy_mode == 'single':
         policy_fn = load_policy(config, checkpoint)

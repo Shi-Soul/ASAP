@@ -57,7 +57,7 @@ class LowLevelMagic:
             self.mode_pr_ = MotorMode.PR
             self.mode_machine_ = config.mode_machine
             # self.mode_machine_ = 0
-            breakpoint() # check the mode machine
+            # breakpoint() # check the mode machine
 
             self.lowcmd_publisher_ = ChannelPublisher(config.lowcmd_topic, LowCmdHG)
             self.lowcmd_publisher_.Init()
@@ -111,6 +111,9 @@ class LowLevelMagic:
         self.lowcmd_publisher_.Write(self.low_cmd)
 
     def LowStateCallback(self):
+        
+        if self.joystick.button[KeyMap.B] == 1: # quick stop
+            self.safe_exit()
         pass
     
     def receive_state_handler(self, msg: LowStateHG):
@@ -123,7 +126,7 @@ class LowLevelMagic:
         
     def _wait(self):
         while self.low_state.tick == 0:
-            time.sleep(0.01)
+            time.sleep(0.1)
             logger.info("Waiting for the robot to connect...")
         logger.info("Successfully connected to the robot.")
         
@@ -188,14 +191,16 @@ class RealRobot(URCIRobot, LowLevelMagic):
     REAL=True
     
     def __init__(self, cfg: OmegaConf):
-        super().__init__(cfg)
+        URCIRobot.__init__(self, cfg)
+        LowLevelMagic.__init__(self, cfg)
+        
         
         self.cfg: OmegaConf = cfg
         self.device: str = "cpu"
         self.dt: float = cfg.deploy.ctrl_dt
         self.timer: int = 0
         
-        self.num_real_dofs: int = len(self.low_cmd.motor_cmd)
+        self.num_real_dofs: int = 29
         self.cmd: np.ndarray = np.array(cfg.deploy.defcmd)
         assert self.num_real_dofs == 29, "Only 29 dofs are supported for now"
         
@@ -303,9 +308,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
     def LowStateCallback(self):
         
         # handle joystick keyboard
-        
-        if self.joystick.button[KeyMap.B] == 1: # quick stop
-            self.safe_exit()
+        LowLevelMagic.LowStateCallback(self)
             
         pass
             
