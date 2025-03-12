@@ -130,8 +130,10 @@ def main(n_days, max_id, output_dir):
             
             target_file = f"model_{max_number}.pt"
             target_event = f"events.out.tfevents*"
+            target_config = f"config.yaml"
             src_file = os.path.join(bbb_path, target_file)
             src_event = glob.glob(os.path.join(bbb_path, target_event))
+            src_config = os.path.join(bbb_path, target_config)
             
             # 检查文件是否在n天前创建
             if is_file_older_than_n_days(src_file, n_days):
@@ -143,6 +145,10 @@ def main(n_days, max_id, output_dir):
                     trg_event_file_path = os.path.join(bbb_output_path, os.path.basename(src_event[0]))
                     print(f"Copying event file from {src_event[0]} to {trg_event_file_path}")
                     shutil.copy(src_event[0], trg_event_file_path)
+                if os.path.exists(src_config):
+                    trg_config_file_path = os.path.join(bbb_output_path, target_config)
+                    print(f"Copying config file from {src_config} to {trg_config_file_path}")
+                    shutil.copy(src_config, trg_config_file_path)
                 
                 dst_file = os.path.join(bbb_output_path, target_file)
                 print(f"Copying file from {src_file} to {dst_file}")
