@@ -73,7 +73,8 @@ class PPO(BaseAlgo):
         # Logging related Config
 
         self.save_interval = self.config.save_interval
-        self.logging_interval = self.config.logging_interval
+        self.logging_interval = self.config.get('logging_interval', 10)
+        # self.logging_interval = self.config.logging_interval
         # Training related Config
         self.num_steps_per_env = self.config.num_steps_per_env
         self.load_optimizer = self.config.load_optimizer
