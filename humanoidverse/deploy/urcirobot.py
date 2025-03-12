@@ -83,7 +83,7 @@ class URCIRobot:
                 policy_fn = cfg_policies[cur_pid][1]
                 
                 # TODO: cleaning state, history about 'ref_motion_phase'
-                self.timer=0 # TODO unify it.
+                self.timer=0 
                 self.history_handler.history['ref_motion_phase']*=0
                 
                 self.UpdateObsWoHistory() # Recompute obs with new _obs_cfg_obs

@@ -218,6 +218,7 @@ num_envs=4096 \
 +device=cuda:1 \
 project_name=G1Loco \
 experiment_name=v0drss22_wf_PrivDr \
++checkpoint=\
 headless=True
 
 

@@ -214,10 +214,11 @@ class PPO(BaseAlgo):
             }
             self._post_epoch_logging(log_dict)
             if it % self.save_interval == 0:
+                self.current_learning_iteration = it
                 self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
             self.ep_infos.clear()
         
-        self.current_learning_iteration += num_learning_iterations
+        
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
 
     def _actor_rollout_step(self, obs_dict, policy_state_dict):
