@@ -33,8 +33,9 @@ class URCIRobot:
     
     _obs_cfg_obs: Optional[OmegaConf]=None
     _ref_pid = 0 # reference policy id
+                    # Normal pid: (0,1,2,3)
+                    # Special pid: (-2, -3, -4)
     
-    # TODO: merging __init__ for both Mujoco and Real, sharing more code
     def __init__(self, cfg: OmegaConf):
         self.BYPASS_ACT = cfg.deploy.BYPASS_ACT
         
@@ -59,7 +60,6 @@ class URCIRobot:
             self.is_motion_tracking = False
         
     
-    # TODO: add a bottom for Reset and continue running
     def routing(self, cfg_policies: List[Tuple[OmegaConf, Callable]]):
         self._check_init()
         self.cmd[3]=self.rpy[2]
@@ -70,6 +70,12 @@ class URCIRobot:
             # TODO: auto change policy when a motion tracking is done
             
             if cur_pid != self._ref_pid:
+                if self._ref_pid == -2:
+                    self.Reset()
+                    self._ref_pid = cur_pid
+                    t1 = time.time()
+                    ...
+                
                 self._ref_pid %= len(cfg_policies)
                 assert self._ref_pid >= 0 and self._ref_pid < len(cfg_policies), f"Invalid policy id: {self._ref_pid}"
                 cur_pid = self._ref_pid
@@ -80,10 +86,9 @@ class URCIRobot:
                 self.timer=0 # TODO unify it.
                 self.history_handler.history['ref_motion_phase']*=0
                 
-                self.GetState()
-                self.UpdateObsWoHistory()
+                self.UpdateObsWoHistory() # Recompute obs with new _obs_cfg_obs
                 
-                breakpoint()
+                # breakpoint()
             
             action = policy_fn(self.Obs())[0]
             
@@ -110,6 +115,12 @@ class URCIRobot:
 
         while True:
             t1 = time.time()
+            
+            if self._ref_pid == -2:
+                self.Reset()
+                self._ref_pid = 0
+                t1 = time.time()
+                ...
             
             action = policy_fn(self.Obs())[0]
             

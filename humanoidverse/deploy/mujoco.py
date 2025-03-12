@@ -137,13 +137,14 @@ class MujocoRobot(URCIRobot):
                 elif key == glfw.KEY_APOSTROPHE:
                     self.cmd = np.array(self.cfg.deploy.defcmd)
                 elif key == glfw.KEY_ENTER:
-                    self.Reset()
+                    # self.Reset()
+                    self._ref_pid = -2
                 elif key == glfw.KEY_LEFT_BRACKET:
                     self._ref_pid -= 1
                 elif key == glfw.KEY_RIGHT_BRACKET:
                     self._ref_pid += 1
                 
-                print(self.cmd)
+                print(self.cmd, self._ref_pid)
             self.viewer._key_callback(window, key, scancode, action, mods)
         glfw.set_key_callback(self.viewer.window, _key_callback)
 
