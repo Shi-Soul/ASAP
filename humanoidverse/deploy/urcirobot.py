@@ -80,6 +80,7 @@ class URCIRobot:
                 self.timer=0 # TODO unify it.
                 self.history_handler.history['ref_motion_phase']*=0
                 
+                self.GetState()
                 self.UpdateObsWoHistory()
                 
                 breakpoint()
@@ -143,7 +144,6 @@ class URCIRobot:
         raise NotImplementedError("Not implemented")
     
     def UpdateObsWoHistory(self):
-        self.GetState()
         
         obs_cfg_obs = self.cfg.obs if self._obs_cfg_obs is None else self._obs_cfg_obs
         
@@ -185,6 +185,7 @@ class URCIRobot:
     
 
     def UpdateObs(self):
+        self.GetState()
         self.UpdateObsWoHistory()
         self.UpdateObsForHistory()
         
