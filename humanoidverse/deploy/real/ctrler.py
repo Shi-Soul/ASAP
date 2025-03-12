@@ -215,7 +215,7 @@ class RealRobot(URCIRobot, LowLevelMagic):
         self.clip_observations: float = cfg.env.config.normalization.clip_observations
         self.action_scale: float = cfg.robot.control.action_scale
         self.dof_idx_23_to_29: List[int] = cfg.deploy.dof_idx_23_to_29
-        self.dof_idx_locked: List[int] = [i for i in range(23, 29) if i not in self.dof_idx_23_to_29]
+        self.dof_idx_locked: List[int] = [i for i in range(0, 29) if i not in self.dof_idx_23_to_29]
         self.locked_kp: float = cfg.deploy.locked_kp
         self.locked_kd: float = cfg.deploy.locked_kd
         
@@ -349,7 +349,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
             create_zero_cmd(self.low_cmd)
             self.send_cmd()
             time.sleep(self.dt)
-            breakpoint()
     
     def ToDefaultPose(self):
         logger.info("Moving to default pos.")
@@ -394,7 +393,6 @@ class RealRobot(URCIRobot, LowLevelMagic):
                 self.low_cmd.motor_cmd[j].tau = 0
             self.send_cmd()
             time.sleep(self.dt)
-
 
 
 
