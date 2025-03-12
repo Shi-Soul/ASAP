@@ -190,7 +190,7 @@ python humanoidverse/train_agent.py \
         \
 robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
 num_envs=4096 \
-+device=cuda:0 \
++device=cuda:1 \
 project_name=G1Loco \
 experiment_name=v0drss22_wf_PrivDr \
 headless=True
