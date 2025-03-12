@@ -3,6 +3,29 @@ HYDRA_FULL_ERROR=1 python humanoidverse/eval_agent.py +checkpoint=xxx/xxxx/model
 
 # Locomotion
 
+
+
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
+        \
++domain_rand=dr_wjx_nil \
++rewards=loco/reward_g1_locomotion \
++obs=loco/wjx_hist_dr \
+        \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=128 \
++device=cuda:0 \
+project_name=G1Loco \
+experiment_name=Debug \
+headless=True
+
+
+
 # No DR
 python humanoidverse/train_agent.py \
 +simulator=isaacgym \
@@ -120,6 +143,8 @@ project_name=G1Loco \
 experiment_name=v0Nil_wf_PrivDr \
 headless=True
 
+
+# 25.03.12
 
 python humanoidverse/train_agent.py \
 +simulator=isaacgym \
