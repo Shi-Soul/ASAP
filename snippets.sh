@@ -159,6 +159,62 @@ project_name=G1Loco \
 experiment_name=v0drss2_wf_PrivDr \
 headless=True
 
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
+        \
++domain_rand=dr_wjx_ss21 \
++rewards=loco/reward_g1_locomotion \
++obs=loco/wjx_hist_dr \
+        \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
++device=cuda:0 \
+project_name=G1Loco \
+experiment_name=v0drss21_wf_PrivDr \
+headless=True
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
+        \
++domain_rand=dr_wjx_ss22 \
++rewards=loco/reward_g1_locomotion \
++obs=loco/wjx_hist_dr \
+        \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
++device=cuda:0 \
+project_name=G1Loco \
+experiment_name=v0drss22_wf_PrivDr \
+headless=True
+
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
+        \
++domain_rand=dr_wjx_ss23 \
++rewards=loco/reward_g1_locomotion \
++obs=loco/wjx_hist_dr \
+        \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
++device=cuda:0 \
+project_name=G1Loco \
+experiment_name=v0drss23_wf_PrivDr \
+headless=True
+
+
 # Motion Tracking
 
 
