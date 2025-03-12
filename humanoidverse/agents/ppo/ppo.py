@@ -12,6 +12,7 @@ from humanoidverse.utils.average_meters import TensorAverageMeterDict
 from torch.utils.tensorboard import SummaryWriter as TensorboardSummaryWriter
 import time
 import os
+from typing import List, Dict, Any
 import statistics
 from collections import deque
 from hydra.utils import instantiate
@@ -37,6 +38,7 @@ class PPO(BaseAlgo):
         self.env = env
         self.config = config
         self.log_dir = log_dir
+        
         self.writer = TensorboardSummaryWriter(log_dir=self.log_dir, flush_secs=10)
 
         
@@ -52,7 +54,7 @@ class PPO(BaseAlgo):
         self.current_learning_iteration = 0
 
         # Book keeping
-        self.ep_infos = []
+        self.ep_infos: List[Dict[str, Any]] = []
         self.rewbuffer = deque(maxlen=100)
         self.lenbuffer = deque(maxlen=100)
         self.cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
@@ -71,6 +73,7 @@ class PPO(BaseAlgo):
         # Logging related Config
 
         self.save_interval = self.config.save_interval
+        self.logging_interval = self.config.logging_interval
         # Training related Config
         self.num_steps_per_env = self.config.num_steps_per_env
         self.load_optimizer = self.config.load_optimizer
@@ -204,7 +207,7 @@ class PPO(BaseAlgo):
                 'loss_dict': loss_dict,
                 'collection_time': self.collection_time,
                 'learn_time': self.learn_time,
-                'ep_infos': self.ep_infos,
+                'ep_infos': self.ep_infos, # len(ep_infos) = 24 = rollout steps
                 'rewbuffer': self.rewbuffer,
                 'lenbuffer': self.lenbuffer,
                 'num_learning_iterations': num_learning_iterations
@@ -475,11 +478,14 @@ class PPO(BaseAlgo):
             "critic": self.critic
         }
 
-    def _post_epoch_logging(self, log_dict, width=80, pad=40, report_frequency=1):
+    def _post_epoch_logging(self, log_dict, width=80, pad=40):
         # Update total timesteps and total time
         self.tot_timesteps += self.num_steps_per_env * self.env.num_envs
         self.tot_time += log_dict['collection_time'] + log_dict['learn_time']
         iteration_time = log_dict['collection_time'] + log_dict['learn_time']
+        
+        if log_dict['it'] % self.logging_interval != 0:  # Check report frequency
+            return
 
         # Closure functions to generate log strings
         def generate_computation_log():
@@ -495,50 +501,92 @@ class PPO(BaseAlgo):
         def generate_reward_length_log():
             # Generate log for mean reward and mean episode length
             reward_length_string = ""
+            
+            
             if len(log_dict['rewbuffer']) > 0:
                 reward_length_string += (f"""{'Mean reward:':>{pad}} {statistics.mean(log_dict['rewbuffer']):>10.4f}\n"""
                                          f"""{'Mean episode length:':>{pad}} {statistics.mean(log_dict['lenbuffer']):>10.4f}\n""")
+                
+                
+                self.writer.add_scalar('Train/mean_reward', statistics.mean(log_dict['rewbuffer']), log_dict['it'])
+                self.writer.add_scalar('Train/mean_episode_length', statistics.mean(log_dict['lenbuffer']), log_dict['it'])
             return reward_length_string
 
         def generate_env_log():
             # Generate log for environment metrics
             env_log_string = ""
             env_log_dict = self.episode_env_tensors.mean_and_clear()
-            env_log_dict = {f"Env/{k}": v for k, v in env_log_dict.items()}
+            env_log_dict = {f"{k}": v for k, v in env_log_dict.items()}
             
             for k, v in env_log_dict.items():
                 entry = f"{f'{k}:':>{pad}} {v:>10.4f}"
                 env_log_string += f"{entry}\n"
+                self.writer.add_scalar(k, v, log_dict['it'])
+                
+                
+            for loss_key, loss_value in log_dict['loss_dict'].items():
+                self.writer.add_scalar(f'Learn/{loss_key}', loss_value, log_dict['it'])
+            self.writer.add_scalar('Learn/actor_learning_rate', self.actor_learning_rate, log_dict['it'])
+            self.writer.add_scalar('Learn/critic_learning_rate', self.critic_learning_rate, log_dict['it'])
+            self.writer.add_scalar('Learn/mean_noise_std', self.actor.std.mean().item(), log_dict['it'])
+            
+            
             return env_log_string
 
         def generate_episode_log():
             # Generate log for episode information
             ep_string = f"{'-' * width}\n"  # Add a separator line before episode info
+            
             if log_dict['ep_infos']:
-                for key in log_dict['ep_infos'][0]:
-                    infotensor = torch.tensor([], device=self.device)
-                    for ep_info in log_dict['ep_infos']:
-                        # Handle scalar and zero-dimensional tensor infos
-                        if not isinstance(ep_info[key], torch.Tensor):
-                            ep_info[key] = torch.Tensor([ep_info[key]])
-                        if len(ep_info[key].shape) == 0:
-                            ep_info[key] = ep_info[key].unsqueeze(0)
-                        infotensor = torch.cat((infotensor, ep_info[key].to(self.device)))
-                    value = torch.mean(infotensor)
-                    self.writer.add_scalar('Episode/' + key, value, log_dict['it'])
-                    ep_string += f"""{f'{key}:':>{pad}} {value:>10.4f}\n"""  # Removed "Mean episode" prefix
+                # Initialize a dictionary to hold the sum and count for mean calculation
+                mean_values = {key: 0.0 for key in log_dict['ep_infos'][0].keys()}
+                total_episodes = 0
+
+                for ep_info in log_dict['ep_infos']:
+                    # Sum the values for mean calculation
+                    for key in mean_values.keys():
+                        # Check if the key is 'end_epis_length' and handle it accordingly
+                        if key == 'end_epis_length':
+                            # Sum the lengths of episodes
+                            mean_values[key] += ep_info[key].sum().item()  # Convert tensor to scalar
+                            total_episodes += ep_info[key].numel()  # Count the number of episodes
+                        else:
+                            mean_values[key] += (
+                                        ep_info[key]  / ep_info['end_epis_length'] * self.env.max_episode_length 
+                                                ).sum().item()  # Average for other keys
+
+                # Calculate the mean for each key
+                for key in mean_values.keys():
+                    mean_values[key] /= total_episodes  # Mean over all episode lengths
+
+                    self.writer.add_scalar('Env/' + key, mean_values[key], log_dict['it'])
+                # Prepare the string for logging
+                for key, value in mean_values.items():
+                    if key == 'end_epis_length': continue
+                    ep_string += f"""{f'{key}:':>{pad}} {value:>10.4f} \n"""  # Print mean values with 4 decimal places
+            ep_string += f"Note: reward computed per step\n"
+
             return ep_string
 
         def generate_total_time_log():
             # Calculate ETA and generate total time log
+            fps = int(self.num_steps_per_env * self.env.num_envs / iteration_time)
             eta = self.tot_time / (log_dict['it'] + 1) * (log_dict['num_learning_iterations'] - log_dict['it'])
+            
+            self.writer.add_scalar('Perf/total_fps', fps, log_dict['it'])
+            self.writer.add_scalar('Perf/collection_time', log_dict['collection_time'], log_dict['it'])
+            self.writer.add_scalar('Perf/learning_time', log_dict['learn_time'], log_dict['it'])
+            self.writer.add_scalar('Perf/iter_time', iteration_time, log_dict['it'])
+            self.writer.add_scalar('Perf/total_time', self.tot_time, log_dict['it'])  # Log total time
+        
             return (f"""{'-' * width}\n"""
                     f"""{'Total timesteps:':>{pad}} {self.tot_timesteps:.0f}\n"""  # Integer without decimal
                     f"""{'Collection time:':>{pad}} {log_dict['collection_time']:>10.4f}s\n"""  # Four decimal places
                     f"""{'Learning time:':>{pad}} {log_dict['learn_time']:>10.4f}s\n"""  # Four decimal places
                     f"""{'Iteration time:':>{pad}} {iteration_time:>10.4f}s\n"""  # Four decimal places
                     f"""{'Total time:':>{pad}} {self.tot_time:>10.4f}s\n"""  # Four decimal places
-                    f"""{'ETA:':>{pad}} {eta:>10.4f}s\n""")  # Four decimal places
+                    f"""{'ETA:':>{pad}} {eta:>10.4f}s\n"""
+                    f"""{'Time Now:':>{pad}} {time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}\n""")  # Four decimal places
 
         # Generate all log strings
         log_string = (generate_computation_log() +
@@ -549,39 +597,8 @@ class PPO(BaseAlgo):
                       f"Logging Directory: {self.log_dir}")
 
         # Use rich Live to update a specific section of the console
-        if log_dict['it'] % report_frequency == 0:  # Check report frequency
-            with Live(Panel(log_string, title="Training Log"), refresh_per_second=4, console=console):
-                pass
-
-        # Call the logging function to write data to the writer
-        train_log_dict = {
-            'fps': int(self.num_steps_per_env * self.env.num_envs / iteration_time),
-            'mean_std': self.actor.std.mean().item()
-        }
-        env_log_dict = self.episode_env_tensors.mean_and_clear()
-        env_log_dict = {f"Env/{k}": v for k, v in env_log_dict.items()}
-        
-        self._logging_to_writer(log_dict, train_log_dict, env_log_dict)
-
-    def _logging_to_writer(self, log_dict, train_log_dict, env_log_dict):
-        # Log loss dictionary
-        for loss_key, loss_value in log_dict['loss_dict'].items():
-            self.writer.add_scalar(f'Loss/{loss_key}', loss_value, log_dict['it'])
-        self.writer.add_scalar('Loss/actor_learning_rate', self.actor_learning_rate, log_dict['it'])
-        self.writer.add_scalar('Loss/critic_learning_rate', self.critic_learning_rate, log_dict['it'])
-        self.writer.add_scalar('Policy/mean_noise_std', train_log_dict['mean_std'], log_dict['it'])
-        self.writer.add_scalar('Perf/total_fps', train_log_dict['fps'], log_dict['it'])
-        self.writer.add_scalar('Perf/collection time', log_dict['collection_time'], log_dict['it'])
-        self.writer.add_scalar('Perf/learning_time', log_dict['learn_time'], log_dict['it'])
-        self.writer.add_scalar('Perf/total_time', self.tot_time, log_dict['it'])  # Log total time
-        if len(log_dict['rewbuffer']) > 0:
-            self.writer.add_scalar('Train/mean_reward', statistics.mean(log_dict['rewbuffer']), log_dict['it'])
-            self.writer.add_scalar('Train/mean_episode_length', statistics.mean(log_dict['lenbuffer']), log_dict['it'])
-            self.writer.add_scalar('Train/mean_reward/time', statistics.mean(log_dict['rewbuffer']), self.tot_time)
-            self.writer.add_scalar('Train/mean_episode_length/time', statistics.mean(log_dict['lenbuffer']), self.tot_time)
-        if len(env_log_dict) > 0:
-            for k, v in env_log_dict.items():
-                self.writer.add_scalar(k, v, log_dict['it'])
+        with Live(Panel(log_string, title="Training Log"), refresh_per_second=4, console=console):
+            pass
 
     ##########################################################################################
     # Code for Evaluation

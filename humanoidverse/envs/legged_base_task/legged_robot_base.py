@@ -384,10 +384,12 @@ class LeggedRobotBase(BaseTask):
         # fill extras
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
-            self.extras["episode"]['rew_' + key] = torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
+            self.extras["episode"]['rew_' + key] = (self.episode_sums[key][env_ids]) / self.max_episode_length_s
             self.episode_sums[key][env_ids] = 0.
         self.extras["time_outs"] = self.time_out_buf
+        self.extras["episode"]["end_epis_length"] = self.last_episode_length_buf[env_ids]
         # self._refresh_sim_tensors()
+        # breakpoint()
 
 
     def _reset_robot_states_callback(self, env_ids, target_states=None):

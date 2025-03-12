@@ -20,6 +20,7 @@ algo:
 
     num_steps_per_env: 24
     save_interval: 100
+    logging_interval: 10
 
     load_optimizer: True
 
