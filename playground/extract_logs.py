@@ -5,6 +5,7 @@ import tarfile
 import time
 import argparse
 import math
+import glob
 
 def extract_number(filename):
     """从文件名中提取数字部分并返回整数."""
@@ -128,7 +129,9 @@ def main(n_days, max_id, output_dir):
                 continue
             
             target_file = f"model_{max_number}.pt"
+            target_event = f"events.out.tfevents*"
             src_file = os.path.join(bbb_path, target_file)
+            src_event = glob.glob(os.path.join(bbb_path, target_event))
             
             # 检查文件是否在n天前创建
             if is_file_older_than_n_days(src_file, n_days):
@@ -136,6 +139,11 @@ def main(n_days, max_id, output_dir):
                 continue
             
             if target_file in files:
+                if len(src_event) > 0:
+                    trg_event_file_path = os.path.join(bbb_output_path, src_event[0])
+                    print(f"Copying event file from {src_event[0]} to {trg_event_file_path}")
+                    shutil.copy(src_event[0], trg_event_file_path)
+                
                 dst_file = os.path.join(bbb_output_path, target_file)
                 print(f"Copying file from {src_file} to {dst_file}")
                 shutil.copy(src_file, dst_file)
