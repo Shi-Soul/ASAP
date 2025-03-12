@@ -10,6 +10,8 @@ rewards:
   reward_scales:
       tracking_lin_vel: 1.0
       tracking_ang_vel: 0.5
+      standstill: 10
+
       feet_air_time: 1.0
       base_height: -10.0
       limits_dof_pos: -10.0
@@ -45,6 +47,7 @@ rewards:
   reward_tracking_sigma:
     lin_vel: 0.25
     ang_vel: 0.25
+    standstill: 0.2
   reward_limit:
     soft_dof_pos_limit: 0.9
     soft_dof_vel_limit: 0.9
