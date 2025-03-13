@@ -40,6 +40,8 @@ def main(override_config: OmegaConf):
     1. Single  Policy Method
         python humanoidverse/urci.py +simulator=mujoco +checkpoint=/path/to/checkpoint.onnx
         python humanoidverse/urci.py +simulator=real +checkpoint=/path/to/checkpoint.onnx
+            simulator.config.sim.fps=500 simulator.config.sim.control_decimation=10
+            robot.asset.xml_file="g1/g1_23dof_lock_wrist_phys_inertia.xml"
     2. Multiple Policy Method
         export CKPTS="[/path/to/ckp1.onnx,/path/to/ckp2.onnx,/path/to/ckp3.onnx]"
         python humanoidverse/urci.py +simulator=mujoco +checkpoint=$CKPTS

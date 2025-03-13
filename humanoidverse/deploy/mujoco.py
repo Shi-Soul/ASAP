@@ -96,6 +96,9 @@ class MujocoRobot(URCIRobot):
         logger.info("Robot Type: {}".format(cfg.robot.asset.robot_type))
         
         
+        logger.info(f"decimation: {self.decimation}, sim_dt: {self.sim_dt}, dt: {self.dt}")
+        logger.info(f"xml_file: {cfg.robot.asset.xml_file}")
+        # print(self.decimation, self.sim_dt, self.dt)
         self.Reset()
         
         mujoco.mj_step(self.model, self.data) # type: ignore    
