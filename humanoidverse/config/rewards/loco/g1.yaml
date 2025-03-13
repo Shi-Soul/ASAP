@@ -42,6 +42,7 @@ rewards:
       penalty_hip_pos: -1.0
 
       # custom reward
+      alive: 0.3
       collision: -1.0
 
   reward_tracking_sigma:

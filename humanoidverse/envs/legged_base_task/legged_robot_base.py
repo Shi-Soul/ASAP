@@ -780,6 +780,10 @@ class LeggedRobotBase(BaseTask):
         # Terminal reward / penalty
         return self.reset_buf * ~self.time_out_buf
 
+    def _reward_alive(self):
+        # Reward alive
+        return 1.0
+
     def _reward_penalty_torques(self):
         # Penalize torques
         return torch.sum(torch.square(self.torques), dim=1)
