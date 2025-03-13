@@ -557,11 +557,21 @@ class PPO(BaseAlgo):
                                         ep_info[key]  / ep_info['end_epis_length'] * self.env.max_episode_length 
                                                 ).sum().item()  # Average for other keys
 
+                rew_total = 0
+                for key, value in mean_values.items():
+                    if key.startswith('rew_'):
+                        rew_total += value
+                        
+                mean_values['rew_total'] = rew_total
+                
                 # Calculate the mean for each key
                 for key in mean_values.keys():
                     mean_values[key] /= total_episodes  # Mean over all episode lengths
 
                     self.writer.add_scalar('Env/' + key, mean_values[key], log_dict['it'])
+                    
+                    
+                        
                 # Prepare the string for logging
                 for key, value in mean_values.items():
                     if key == 'end_epis_length': continue
