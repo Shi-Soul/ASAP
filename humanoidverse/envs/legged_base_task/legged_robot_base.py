@@ -782,7 +782,7 @@ class LeggedRobotBase(BaseTask):
 
     def _reward_alive(self):
         # Reward alive
-        return 1.0
+        return 1.0 * torch.ones_like(self.reset_buf)
 
     def _reward_penalty_torques(self):
         # Penalize torques
