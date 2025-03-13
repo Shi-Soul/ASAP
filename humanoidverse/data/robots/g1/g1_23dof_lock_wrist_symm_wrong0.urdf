@@ -1,5 +1,3 @@
-<!-- This is NOT symmetry version, is just copied from urdf v0 -->
-
 <robot name="g1_29dof_rev_1_0">
   <mujoco>
     <compiler meshdir="meshes" discardvisual="false"/>
@@ -444,9 +442,9 @@
   <!-- Torso -->
   <link name="waist_yaw_link">
     <inertial>
-      <origin xyz="0.003494 0.000233 0.018034" rpy="0 0 0"/>
+      <origin xyz="0.0 0.000233 0.018034" rpy="0 0 0"/>
       <mass value="0.214"/>
-      <inertia ixx="0.00010673" ixy="2.703E-06" ixz="-7.631E-06" iyy="0.00010422" iyz="-2.01E-07" izz="0.0001625"/>
+      <inertia ixx="0.00010673" ixy="0" ixz="0" iyy="0.00010422" iyz="0" izz="0.0001625"/>
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -482,7 +480,7 @@
     </visual>
   </link>
   <joint name="waist_roll_joint" type="revolute">
-    <origin xyz="-0.0039635 0 0.044" rpy="0 0 0"/>
+    <origin xyz="-0.0 0 0.044" rpy="0 0 0"/>
     <parent link="waist_yaw_link"/>
     <child link="waist_roll_link"/>
     <axis xyz="1 0 0"/>
@@ -490,9 +488,9 @@
   </joint>
   <link name="torso_link">
     <inertial>
-      <origin xyz="0.000931 0.000346 0.15082" rpy="0 0 0"/>
+      <origin xyz="0.00 0.000346 0.15082" rpy="0 0 0"/>
       <mass value="6.78"/>
-      <inertia ixx="0.05905" ixy="3.3302E-05" ixz="-0.0017715" iyy="0.047014" iyz="-2.2399E-05" izz="0.025652"/>
+      <inertia ixx="0.05905" ixy="0" ixz="0" iyy="0.047014" iyz="0" izz="0.025652"/>
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -527,7 +525,7 @@
   <link name="logo_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.001"/>
+      <mass value="0.00001"/>
       <inertia ixx="1e-7" ixy="0" ixz="0" iyy="1e-7" iyz="0" izz="1e-7"/>
     </inertial>
     <visual>
@@ -550,9 +548,9 @@
   <!-- Head -->
   <link name="head_link">
     <inertial>
-      <origin xyz="0.005267 0.000299 0.449869" rpy="0 0 0"/>
+      <origin xyz="0.00 0.000299 0.449869" rpy="0 0 0"/>
       <mass value="1.036"/>
-      <inertia ixx="0.004085051" ixy="-2.543E-06" ixz="-6.9455E-05" iyy="0.004185212" iyz="-3.726E-06" izz="0.001807911"/>
+      <inertia ixx="0.004085051" ixy="0" ixz="0" iyy="0.004185212" iyz="0" izz="0.001807911"/>
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -571,7 +569,7 @@
     </collision>
   </link>
   <joint name="head_joint" type="fixed">
-    <origin xyz="0.0039635 0 -0.044" rpy="0 0 0"/>
+    <origin xyz="0.0 0 -0.044" rpy="0 0 0"/>
     <parent link="torso_link"/>
     <child link="head_link"/>
   </joint>

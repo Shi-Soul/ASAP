@@ -3,7 +3,7 @@ HYDRA_FULL_ERROR=1 python humanoidverse/eval_agent.py +checkpoint=xxx/xxxx/model
 
 # Data packing
 # In cloud:
-python playground/extract_logs.py --n_days 3 --max_id 2000 &&  curl -u xieweiji180:aef417d0b26566c15598c4237cc00e64 -T ./output.tar.gz "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz"
+python playground/extract_logs.py --n_days 3 --max_id 100000 &&  curl -u xieweiji180:aef417d0b26566c15598c4237cc00e64 -T ./output.tar.gz "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz"
 # In local:
 wget -O asap.tar.gz --user=xieweiji180 --password=aef417d0b26566c15598c4237cc00e64 "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz" && python playground/unpack_logs.py --input asap.tar.gz && rm asap.tar.gz
 
@@ -30,6 +30,7 @@ project_name=DebugLocomotion \
 experiment_name=Debug \
 headless=True
 
+# 25.03.12
 
 python humanoidverse/train_agent.py \
 +simulator=isaacgym \
@@ -45,12 +46,12 @@ python humanoidverse/train_agent.py \
         \
 robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
 num_envs=4096 \
++device=cuda:4 \
 project_name=G1Loco \
-experiment_name=v1Nil \
+experiment_name=v1Nil_nostandstill \
+rewards.reward_scales.standstill=0.0 \
 headless=True
 
-
-# 25.03.12
 
 python humanoidverse/train_agent.py \
 +simulator=isaacgym \
@@ -66,8 +67,10 @@ python humanoidverse/train_agent.py \
         \
 robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
 num_envs=4096 \
++device=cuda:5 \
 project_name=G1Loco \
-experiment_name=v1drss \
+experiment_name=v1drss_nostandstill \
+rewards.reward_scales.standstill=0.0 \
 headless=True
 
 
@@ -85,9 +88,10 @@ python humanoidverse/train_agent.py \
         \
 robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
 num_envs=4096 \
-+device=cuda:0 \
++device=cuda:6 \
 project_name=G1Loco \
-experiment_name=v1drss2 \
+experiment_name=v1drss2_nostandstill \
+rewards.reward_scales.standstill=0.0 \
 headless=True
 
 
