@@ -33,6 +33,20 @@ headless=True
 
 # 25.03.14
 
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
++domain_rand=dr_wjx_s \
++rewards=loco/urgg1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
+project_name=G1Loco \
+experiment_name=v2URGG1_drs \
++device=cuda:0 \
+headless=True
 
 #----------------------------------------------------------
 

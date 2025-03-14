@@ -10,11 +10,12 @@ rewards:
   reward_scales:
       tracking_lin_vel: 1.0
       tracking_ang_vel: 0.5
+      # contact: 0.18
       standstill: 0
 
       feet_air_time: 1.0
       base_height: -10.0
-      feet_heading_alignment: -0.3
+      feet_heading_alignment: -0.0
       upperbody_joint_angle_freeze: -0.2
       waist_joint_angle_freeze: -0.5
 
@@ -43,7 +44,7 @@ rewards:
       penalty_hip_pos: -1.0
 
       # custom reward
-      alive: 0.15
+      alive: 0.2
       collision: -1.0
 
   reward_tracking_sigma:
