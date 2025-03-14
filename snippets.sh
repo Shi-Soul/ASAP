@@ -3,7 +3,7 @@ HYDRA_FULL_ERROR=1 python humanoidverse/eval_agent.py +checkpoint=xxx/xxxx/model
 
 # Data packing
 # In cloud:
-python playground/extract_logs.py --n_days 3 --max_id 400000 &&  curl -u xieweiji180:aef417d0b26566c15598c4237cc00e64 -T ./output.tar.gz "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz"
+python playground/extract_logs.py --n_days 3 --max_id 400000 --min_id 1000 &&  curl -u xieweiji180:aef417d0b26566c15598c4237cc00e64 -T ./output.tar.gz "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz"
 # In local:
 wget -O asap.tar.gz --user=xieweiji180 --password=aef417d0b26566c15598c4237cc00e64 "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz" && python playground/unpack_logs.py --input asap.tar.gz && rm asap.tar.gz
 
