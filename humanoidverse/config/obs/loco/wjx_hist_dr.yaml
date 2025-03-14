@@ -108,3 +108,4 @@ obs:
     - dr_kd: ${robot.dof_obs_size}
     - dr_friction: 1
     - dr_ctrl_delay: 1
+  motion_len: -1

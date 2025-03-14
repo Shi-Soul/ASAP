@@ -43,8 +43,8 @@ python humanoidverse/train_agent.py \
 +obs=loco/wjx_hist_dr \
 robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
 num_envs=4096 \
-project_name=G1Loco \
-experiment_name=v2URGG1_drs \
+project_name=G1Locov2 \
+experiment_name=URGG1_drs \
 +device=cuda:0 \
 headless=True
 
