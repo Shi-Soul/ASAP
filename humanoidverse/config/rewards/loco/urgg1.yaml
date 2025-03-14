@@ -6,7 +6,7 @@
 rewards:
   set_reward: Weiji
   set_reward_date: 20250314
-  only_positive_rewards: False
+  only_positive_rewards: True
   reward_scales:
       tracking_lin_vel: 1.0
       tracking_ang_vel: 0.5
