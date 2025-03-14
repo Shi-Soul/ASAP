@@ -4,7 +4,8 @@ import torch
 from torch import nn
 import numpy as np
 import random
-
+import pickle
+import joblib
 from typing import Any, List, Dict
 from termcolor import colored
 from loguru import logger
@@ -69,6 +70,19 @@ def pre_process_config(config) -> None:
     #         if output_dim == "action_dim":
     #             config.algo.config.network_dict[agent][network].output_dim = config.env.config.robot.actions_dim
                 
+    if config.log_task_name=='motion_tracking':
+        motion_file = config.robot.motion.motion_file
+        if os.path.isfile(motion_file):
+            with open(motion_file, 'rb') as f:
+                motion_data = joblib.load(f)
+            assert len(motion_data) == 1, 'current only support single motion tracking'
+            the_motion_data = motion_data[next(iter(motion_data))]
+            config.obs.motion_len = len(the_motion_data['dof']) / the_motion_data['fps']
+            logger.info(f"motion_len: {config.obs.motion_len}")
+        else:
+            config.obs.motion_len = -1
+    else:
+        config.obs.motion_len = -1
     # print the config
     logger.debug(f"PPO CONFIG")
     logger.debug(f"{config.algo.config.module_dict}")

@@ -83,6 +83,7 @@ class URCIRobot:
                 policy_fn = cfg_policies[cur_pid][1]
                 
                 # TODO: cleaning state, history about 'ref_motion_phase'
+                self.motion_len = self._obs_cfg_obs.motion_len
                 self.timer=0 
                 self.history_handler.history['ref_motion_phase']*=0
                 
@@ -268,13 +269,13 @@ class URCIRobot:
         ...
         
     def _make_motionlib(self):
-        self.cfg.robot.motion.step_dt = self.dt
-        self._motion_lib = MotionLibRobot(self.cfg.robot.motion, num_envs=1, device=self.device)
-        self._motion_lib.load_motions(random_sample=False)
-        
-        self._motion_id = 0
-        self.motion_len = self._motion_lib.get_motion_length(self._motion_id)
-        # breakpoint()
+        self.motion_len = self.cfg.obs.motion_len
+        # self.cfg.robot.motion.step_dt = self.dt
+        # self._motion_lib = MotionLibRobot(self.cfg.robot.motion, num_envs=1, device=self.device)
+        # self._motion_lib.load_motions(random_sample=False)
+        # 
+        # self._motion_id = 0
+        # self.motion_len = self._motion_lib.get_motion_length(self._motion_id)
         ...
         
         
@@ -316,7 +317,7 @@ class URCIRobot:
     
     
     def _get_obs_ref_motion_phase(self):
-        # logger.info(f"Phase: {self.ref_motion_phase}")
+        # logger.info(f"Phase: {self.ref_motion_phase} | {self.motion_len}")
         return torch.tensor(self.ref_motion_phase).reshape(1,)
     
     def _get_obs_dif_local_rigid_body_pos(self):
