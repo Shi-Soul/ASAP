@@ -3,7 +3,7 @@ HYDRA_FULL_ERROR=1 python humanoidverse/eval_agent.py +checkpoint=xxx/xxxx/model
 
 # Data packing
 # In cloud:
-python playground/extract_logs.py --n_days 3 --max_id 4000 &&  curl -u xieweiji180:aef417d0b26566c15598c4237cc00e64 -T ./output.tar.gz "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz"
+python playground/extract_logs.py --n_days 3 --max_id 400000 &&  curl -u xieweiji180:aef417d0b26566c15598c4237cc00e64 -T ./output.tar.gz "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz"
 # In local:
 wget -O asap.tar.gz --user=xieweiji180 --password=aef417d0b26566c15598c4237cc00e64 "https://gz01-srdart.srdcloud.cn/generic/p24hqasyf0004/p24hqasyf0004-embodiedai-release-generic-local//wjx/asap.tar.gz" && python playground/unpack_logs.py --input asap.tar.gz && rm asap.tar.gz
 
@@ -206,6 +206,62 @@ headless=True
 
 ###
 
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lkwr_ankiner \
++domain_rand=dr_wjx_s \
++rewards=loco/g1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lkwr_ankiner.urdf" \
+num_envs=4096 \
+project_name=G1Loco \
+experiment_name=v1drs_OPal1_nostandstill \
+rewards.reward_scales.standstill=0.0 \
+rewards.reward_scales.alive=1.0 \
+rewards.only_positive_rewards=True \
++device=cuda:5 \
+headless=True
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lkwr_ankiner \
++domain_rand=dr_wjx_s \
++rewards=loco/g1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lkwr_ankiner.urdf" \
+num_envs=4096 \
++device=cuda:6 \
+project_name=G1Loco \
+experiment_name=v1drs_OPal2_nostandstill \
+rewards.reward_scales.standstill=0.0 \
+rewards.reward_scales.alive=2.0 \
+rewards.only_positive_rewards=True \
+headless=True
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lkwr_ankiner \
++domain_rand=dr_wjx_s \
++rewards=loco/g1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lkwr_ankiner.urdf" \
+num_envs=4096 \
++device=cuda:7 \
+project_name=G1Loco \
+experiment_name=v1drs_OPal3_nostandstill \
+rewards.reward_scales.standstill=0.0 \
+rewards.reward_scales.alive=3.0 \
+rewards.only_positive_rewards=True \
+headless=True
+
 
 python humanoidverse/train_agent.py \
 +simulator=isaacgym \
@@ -219,13 +275,115 @@ robot.asset.urdf_file="g1/g1_23dof_lkwr_ankiner.urdf" \
 num_envs=4096 \
 +device=cuda:0 \
 project_name=G1Loco \
-experiment_name=v1drs_OPal2_nostandstill \
+experiment_name=v1drs_OPal5_nostandstill \
 rewards.reward_scales.standstill=0.0 \
-rewards.reward_scales.alive=2.0 \
+rewards.reward_scales.alive=5.0 \
 rewards.only_positive_rewards=True \
 headless=True
 
 
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lkwr_ankiner \
++domain_rand=dr_wjx_s \
++rewards=loco/g1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lkwr_ankiner.urdf" \
+num_envs=4096 \
++device=cuda:1 \
+project_name=G1Loco \
+experiment_name=v1drs_OPal10_nostandstill \
+rewards.reward_scales.standstill=0.0 \
+rewards.reward_scales.alive=10.0 \
+rewards.only_positive_rewards=True \
+headless=True
+
+####
+
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lkwr_ankiner \
++domain_rand=dr_wjx_s \
++rewards=loco/g1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lkwr_ankiner.urdf" \
+num_envs=4096 \
++device=cuda:3 \
+project_name=G1Loco \
+experiment_name=v1drs_OPal3_sd5 \
+rewards.reward_scales.standstill=5.0 \
+rewards.reward_scales.alive=3.0 \
+rewards.only_positive_rewards=True \
+headless=True
+
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lkwr_ankiner \
++domain_rand=dr_wjx_s \
++rewards=loco/g1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lkwr_ankiner.urdf" \
+num_envs=4096 \
++device=cuda:3 \
+project_name=G1Loco \
+experiment_name=v1drs_OPal3_sd10 \
+rewards.reward_scales.standstill=10.0 \
+rewards.reward_scales.alive=3.0 \
+rewards.only_positive_rewards=True \
+headless=True
+
+
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
++domain_rand=dr_wjx_s \
++rewards=loco/g1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
++device=cuda:0 \
+project_name=G1Loco \
+experiment_name=v1drs_OPal3_sd10 \
+rewards.reward_scales.standstill=10.0 \
+rewards.reward_scales.alive=3.0 \
+rewards.only_positive_rewards=True \
+headless=True
+
+
+
+python humanoidverse/train_agent.py \
++simulator=isaacgym \
++exp=locomotion \
++terrain=terrain_locomotion_plane \
++robot=g1/g1_23dof_lock_wrist \
++domain_rand=dr_wjx_s \
++rewards=loco/g1 \
++obs=loco/wjx_hist_dr \
+robot.asset.urdf_file="g1/g1_23dof_lock_wrist.urdf" \
+num_envs=4096 \
++device=cuda:1 \
+project_name=G1Loco \
+experiment_name=v1drs_OPal3_sd5 \
+rewards.reward_scales.standstill=5.0 \
+rewards.reward_scales.alive=3.0 \
+rewards.only_positive_rewards=True \
+headless=True
+
+# ----------------------------------
 # 25.03.12
 
 python humanoidverse/train_agent.py \

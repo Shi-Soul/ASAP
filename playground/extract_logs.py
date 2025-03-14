@@ -34,7 +34,7 @@ def clear_directory(directory):
             shutil.rmtree(item_path)  # 删除目录
     print(f"Cleared directory: {directory}")
 
-def main(n_days, max_id, output_dir):
+def main(n_days, max_id, min_id, output_dir):
     print("Starting script...")
     logs_dir = 'logs'
     
@@ -116,7 +116,7 @@ def main(n_days, max_id, output_dir):
             
             # 提取所有文件的数字并找到最大值
             numbers = [extract_number(f) for f in files]
-            numbers = [n for n in numbers if n <= max_id]  # filter the picked number to be not greater than max_id
+            numbers = [n for n in numbers if min_id <= n <= max_id]  # filter the picked number to be within min_id and max_id
             if not numbers:
                 print(f"No valid model_*.pt files in {bbb_path}")
                 continue
@@ -202,6 +202,12 @@ if __name__ == '__main__':
         help="Filter the picked number to be not greater than this value. Default is inf (do not filter)."
     )
     parser.add_argument(
+        '--min_id',
+        type=int,
+        default=0,
+        help="Filter the picked number to be not less than this value. Default is 0 (do not filter)."
+    )
+    parser.add_argument(
         '--output_dir',
         type=str,
         default='output',
@@ -210,4 +216,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     # 调用主函数并传入n_days和max_id参数
-    main(args.n_days, args.max_id, args.output_dir)
+    main(args.n_days, args.max_id, args.min_id, args.output_dir)
